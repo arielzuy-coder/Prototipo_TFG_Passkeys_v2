@@ -19,10 +19,17 @@ import logging
 
 from models import AuditEvent, User, Session as DBSession, RiskEvaluation, Passkey
 from auth.deps import require_audit_reader
+from config import settings
 from database import get_db
 
 # Configurar logging
 logger = logging.getLogger(__name__)
+
+# Nombres de evento que registra la aplicación (services.common.audit)
+EV_LOGIN_SUCCESS = "auth_success"
+EV_LOGIN_FAILED = "auth_failed"          # solo fallos verificados por el servidor
+EV_STEPUP = "stepup_requested"
+LOCAL_TZ = "America/Argentina/Buenos_Aires"
 
 # UC-06: solo administradores y auditores (Tabla 4 de la tesis)
 router = APIRouter(prefix="/api/audit", tags=["Auditoría y Reportes"],
@@ -95,11 +102,14 @@ def apply_filters(query, filters: ReportFilters):
     if filters.ip_addresses:
         query = query.filter(AuditEvent.ip_address.in_(filters.ip_addresses))
     
-    # Ordenamiento
-    if filters.sort_order == "asc":
-        query = query.order_by(asc(getattr(AuditEvent, filters.sort_by)))
-    else:
-        query = query.order_by(desc(getattr(AuditEvent, filters.sort_by)))
+    # Ordenamiento: solo columnas conocidas (sort_by viene del cliente)
+    sortable = {
+        "timestamp": AuditEvent.timestamp,
+        "event_type": AuditEvent.event_type,
+        "ip_address": AuditEvent.ip_address,
+    }
+    column = sortable.get(filters.sort_by or "timestamp", AuditEvent.timestamp)
+    query = query.order_by(asc(column) if filters.sort_order == "asc" else desc(column))
     
     return query
 
@@ -225,26 +235,20 @@ async def export_audit_data(
         events = query.all()
         logger.info(f"Consulta ejecutada: {len(events)} eventos encontrados")
         
-        if len(events) == 0:
-            logger.warning("No se encontraron eventos para exportar")
-            # Retornar archivo vacío con mensaje
-            if export_request.format.lower() == 'csv':
-                content = "id,timestamp,event_type,user_id,ip_address,user_agent\n# No hay datos para exportar"
-            else:
-                content = json.dumps({"message": "No hay datos para exportar", "events": []})
+        fmt = export_request.format.lower()
+        stamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        if fmt == 'csv':
+            content = generate_csv(events, export_request.include_fields)  # sin eventos: solo encabezado
+            media_type = 'text/csv'
+        elif fmt == 'json':
+            content = generate_json(events, export_request.include_fields)  # sin eventos: []
+            media_type = 'application/json'
         else:
-            # Generar contenido según formato
-            if export_request.format.lower() == 'csv':
-                content = generate_csv(events, export_request.include_fields)
-                media_type = 'text/csv'
-                filename = f"audit_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-            elif export_request.format.lower() == 'json':
-                content = generate_json(events, export_request.include_fields)
-                media_type = 'application/json'
-                filename = f"audit_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-            else:
-                raise HTTPException(status_code=400, detail="Formato no soportado. Use 'csv' o 'json'")
-        
+            raise HTTPException(status_code=400, detail="Formato no soportado. Use 'csv' o 'json'")
+        filename = f"audit_export_{stamp}.{fmt}"
+        if not events:
+            logger.warning("No se encontraron eventos para exportar con esos filtros")
+
         logger.info(f"Contenido generado: {len(content)} bytes")
         
         # Retornar como descarga
@@ -257,6 +261,8 @@ async def export_audit_data(
             }
         )
     
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error al exportar datos: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error al exportar datos")
@@ -282,12 +288,12 @@ async def generate_aggregated_report(
         if filters and filters.start_date:
             start = filters.start_date
         else:
-            start = datetime.now() - timedelta(days=30)
+            start = datetime.utcnow() - timedelta(days=30)
         
         if filters and filters.end_date:
             end = filters.end_date
         else:
-            end = datetime.now()
+            end = datetime.utcnow()
         
         # Consulta base con filtros de fecha
         base_query = db.query(AuditEvent).filter(
@@ -311,15 +317,15 @@ async def generate_aggregated_report(
             AuditEvent.timestamp <= end
         ).scalar() or 0
         
-        total_logins = base_query.filter(AuditEvent.event_type == 'login_success').count()
-        failed_logins = base_query.filter(AuditEvent.event_type == 'login_failed').count()
-        stepup_challenges = base_query.filter(AuditEvent.event_type == 'stepup_required').count()
+        total_logins = base_query.filter(AuditEvent.event_type == EV_LOGIN_SUCCESS).count()
+        failed_logins = base_query.filter(AuditEvent.event_type == EV_LOGIN_FAILED).count()
+        stepup_challenges = base_query.filter(AuditEvent.event_type == EV_STEPUP).count()
         
         # Eventos de alto riesgo
         high_risk_query = db.query(func.count(RiskEvaluation.id)).filter(
             RiskEvaluation.evaluated_at >= start,
             RiskEvaluation.evaluated_at <= end,
-            RiskEvaluation.risk_score >= 70
+            RiskEvaluation.risk_score >= settings.RISK_THRESHOLD_HIGH
         )
         high_risk_events = high_risk_query.scalar() or 0
         
@@ -331,13 +337,10 @@ async def generate_aggregated_report(
         
         # Desglose por tipo de evento
         event_breakdown = {}
-        event_types = db.query(
+        event_types = base_query.with_entities(
             AuditEvent.event_type,
             func.count(AuditEvent.id)
-        ).filter(
-            AuditEvent.timestamp >= start,
-            AuditEvent.timestamp <= end
-        ).group_by(AuditEvent.event_type).all()
+        ).group_by(AuditEvent.event_type).order_by(func.count(AuditEvent.id).desc()).all()
         
         for event_type, count in event_types:
             event_breakdown[event_type] = count
@@ -358,12 +361,11 @@ async def generate_aggregated_report(
         ]
         
         # Distribución por hora
-        hourly_dist = db.query(
-            func.extract('hour', AuditEvent.timestamp).label('hour'),
+        # Los timestamps se guardan en UTC: se agrupan por hora de Buenos Aires
+        local_ts = func.timezone(LOCAL_TZ, func.timezone('UTC', AuditEvent.timestamp))
+        hourly_dist = base_query.with_entities(
+            func.extract('hour', local_ts).label('hour'),
             func.count(AuditEvent.id).label('count')
-        ).filter(
-            AuditEvent.timestamp >= start,
-            AuditEvent.timestamp <= end
         ).group_by('hour').order_by('hour').all()
         
         hourly_distribution = [
@@ -453,7 +455,7 @@ async def get_statistics_summary(
     """
     
     try:
-        start_date = datetime.now() - timedelta(days=days)
+        start_date = datetime.utcnow() - timedelta(days=days)
         
         # Métricas básicas
         total_events = db.query(func.count(AuditEvent.id)).filter(
@@ -466,12 +468,12 @@ async def get_statistics_summary(
         
         success_logins = db.query(func.count(AuditEvent.id)).filter(
             AuditEvent.timestamp >= start_date,
-            AuditEvent.event_type == 'login_success'
+            AuditEvent.event_type == EV_LOGIN_SUCCESS
         ).scalar() or 0
         
         failed_logins = db.query(func.count(AuditEvent.id)).filter(
             AuditEvent.timestamp >= start_date,
-            AuditEvent.event_type == 'login_failed'
+            AuditEvent.event_type == EV_LOGIN_FAILED
         ).scalar() or 0
         
         # Tasa de éxito
@@ -509,7 +511,7 @@ async def get_compliance_access_log(
     
     try:
         query = db.query(AuditEvent).filter(
-            AuditEvent.event_type.in_(['login_success', 'access_granted', 'access_denied'])
+            AuditEvent.event_type.in_([EV_LOGIN_SUCCESS, 'access_denied', 'stepup_success', 'session_revoked'])
         )
         
         if user_id:

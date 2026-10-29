@@ -100,16 +100,38 @@ const AuditReports = () => {
     });
   };
   
+  // Tipos de evento que registra el backend (services/common.audit)
+  const EVENT_LABELS = {
+    auth_success: 'Login exitoso',
+    auth_failed: 'Login fallido (verificado)',
+    auth_aborted: 'Login cancelado por el usuario',
+    stepup_requested: 'Step-up solicitado',
+    stepup_success: 'Step-up superado',
+    stepup_failed: 'Step-up fallido',
+    stepup_approval_requested: 'Aprobación de supervisor pedida',
+    stepup_approved: 'Step-up aprobado por supervisor',
+    stepup_denied: 'Step-up rechazado por supervisor',
+    access_denied: 'Acceso denegado',
+    passkey_enrolled: 'Passkey enrolada',
+    passkey_revoked: 'Passkey revocada',
+    reauth_success: 'Re-autenticación',
+    session_reevaluated: 'Sesión reevaluada',
+    session_revoked: 'Sesión revocada',
+    session_ip_changed: 'Cambio de IP en sesión',
+    logout: 'Cierre de sesión',
+    user_created: 'Usuario creado',
+    user_suspended: 'Usuario suspendido',
+    account_recovery_started: 'Recuperación de cuenta',
+    policy_created: 'Política creada',
+    policy_updated: 'Política modificada',
+    policy_toggled: 'Política activada/desactivada',
+    policy_deleted: 'Política eliminada'
+  };
+  const labelOf = (type) => EVENT_LABELS[type] || type.replace(/_/g, ' ');
   const eventTypes = [
-    'login_success',
-    'login_failed',
-    'passkey_registered',
-    'stepup_required',
-    'stepup_completed',
-    'access_granted',
-    'access_denied',
-    'session_created',
-    'session_expired'
+    'auth_success', 'auth_failed', 'auth_aborted', 'stepup_requested', 'stepup_success',
+    'stepup_failed', 'access_denied', 'passkey_enrolled', 'passkey_revoked', 'session_revoked',
+    'reauth_success', 'user_created'
   ];
   
   return (
@@ -192,7 +214,7 @@ const AuditReports = () => {
                   checked={filters.event_types.includes(type)}
                   onChange={() => handleEventTypeToggle(type)}
                 />
-                {type.replace(/_/g, ' ')}
+                {labelOf(type)}
               </label>
             ))}
           </div>
@@ -281,7 +303,7 @@ const AuditReports = () => {
             <div className="breakdown-grid">
               {Object.entries(reportData.event_type_breakdown).map(([type, count]) => (
                 <div key={type} className="breakdown-item">
-                  <span className="breakdown-type">{type.replace(/_/g, ' ')}</span>
+                  <span className="breakdown-type">{labelOf(type)}</span>
                   <span className="breakdown-count">{count}</span>
                 </div>
               ))}
@@ -314,7 +336,7 @@ const AuditReports = () => {
           {/* Distribución por Hora */}
           {reportData.hourly_distribution && reportData.hourly_distribution.length > 0 && (
             <div className="hourly-distribution">
-              <h4>Distribución por Hora del Día</h4>
+              <h4>Distribución por Hora del Día (hora de Buenos Aires)</h4>
               <div className="chart-container">
                 {reportData.hourly_distribution.map(item => (
                   <div key={item.hour} className="chart-bar">

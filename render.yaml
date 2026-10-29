@@ -36,9 +36,10 @@ services:
       # sync: false = Render lo pide al crear el Blueprint y no queda escrito en el repo (que es público)
       - key: BOOTSTRAP_ADMIN_EMAIL
         sync: false
-      # Confirmar con GET /admin/diagnostics/client-ip después del primer despliegue
+      # Render tiene Cloudflare delante de su proxy: la IP del cliente es la penúltima de
+      # X-Forwarded-For (verificado en producción). Confirmar con Panel Admin → Diagnóstico de red.
       - key: TRUSTED_PROXY_HOPS
-        value: "1"
+        value: "2"
 
   # Frontend React como sitio estático (gratis, no se apaga)
   - type: web

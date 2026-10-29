@@ -43,7 +43,8 @@ Si el link vence (72 h) o se reinicia el servicio antes de usarlo, cada arranque
 Panel Admin → Usuarios y Aprobaciones → **Diagnóstico de red**.
 
 - *IP detectada* tiene que ser tu IP pública (comparala con cualquier sitio de "cuál es mi IP").
-- Si aparece una IP interna (10.x, 172.16–31.x) o la de Render, subí `TRUSTED_PROXY_HOPS` a `2` en `render.yaml` y volvé a desplegar.
+- En Render el valor correcto resultó ser `2`: Cloudflare está delante del proxy de Render, así que la IP del cliente es la penúltima de `X-Forwarded-For`. Con `1` se ve una IP de Cloudflare (por ejemplo `162.158.x.x`).
+- Si aparece una IP interna (10.x, 172.16–31.x) o de Cloudflare, ajustá `TRUSTED_PROXY_HOPS` y volvé a desplegar.
 
 Si queda mal, el sistema no se rompe: ve una ubicación desconocida y pide step-up más seguido.
 
