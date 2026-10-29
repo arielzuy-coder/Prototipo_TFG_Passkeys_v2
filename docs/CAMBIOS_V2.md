@@ -108,7 +108,8 @@ de 15 minutos con refresh de 8 horas y rotación obligatoria.
   nunca una IP elegida por el cliente.
 - Las IPs privadas ya no se asumen de Argentina: quedan como ubicación desconocida.
   `LOCAL_IP_COUNTRY=AR` lo habilita solo para desarrollo local.
-- Geolocalización en `risk/geo.py` con caché. `GEOIP_PROVIDER=none` evita enviar IPs a ipapi.co
+- Geolocalización en `risk/geo.py`. Por defecto (`GEOIP_PROVIDER=local`) usa la base GeoLite2 incluida en el paquete `geoip2fast`: no depende de un servicio externo y la IP no sale del servidor. En Render, ipapi.co respondía 429 (IP de salida compartida, cuota agotada) y el país quedaba desconocido, lo que disparaba step-up en todos los logins. Este producto incluye datos GeoLite2 creados por MaxMind, disponibles en https://www.maxmind.com.
+- (Anterior) geolocalización con caché. `GEOIP_PROVIDER=none` evita enviar IPs a ipapi.co
   (minimización de datos, RNF-N2). Los países de bajo riesgo se configuran con `TRUSTED_COUNTRIES`.
 
 ### Límite de intentos (H11)

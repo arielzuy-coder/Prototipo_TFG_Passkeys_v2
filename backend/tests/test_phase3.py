@@ -96,6 +96,16 @@ def test_H9_private_ips_are_not_assumed_argentina(monkeypatch):
     assert geo.lookup("192.168.1.10")["country"] == "AR"
 
 
+def test_H9_local_geolocation_resolves_country_without_network(monkeypatch):
+    from risk import geo
+    monkeypatch.setattr(settings, "GEOIP_PROVIDER", "local")
+    monkeypatch.setattr(geo.requests, "get", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no debe llamar")))
+    assert geo.lookup("190.190.34.79")["country"] == "AR"
+    assert geo.lookup("8.8.8.8")["country"] == "US"
+    assert geo.lookup("2800:810:1::1")["country"] == "AR"
+    assert geo.lookup("no-es-ip")["country"] == "Unknown"
+
+
 def test_H9_geolocation_can_be_disabled(monkeypatch):
     from risk import geo
     monkeypatch.setattr(settings, "GEOIP_PROVIDER", "none")

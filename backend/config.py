@@ -57,8 +57,8 @@ class Settings(BaseSettings):
     # Alternativa: header con la IP real que el proxy SOBRESCRIBE siempre (ej. "true-client-ip")
     CLIENT_IP_HEADER: Optional[str] = None
 
-    # Geolocalización: "ipapi" (ipapi.co, envía la IP a un tercero) o "none"
-    GEOIP_PROVIDER: str = "ipapi"
+    # Geolocalización: "local" (base incluida, la IP no sale del servidor), "ipapi" o "none"
+    GEOIP_PROVIDER: str = "local"
     GEOIP_CACHE_SECONDS: int = 3600
     # País asignado a IPs privadas/loopback. Vacío = ubicación desconocida (recomendado en producción)
     LOCAL_IP_COUNTRY: Optional[str] = None

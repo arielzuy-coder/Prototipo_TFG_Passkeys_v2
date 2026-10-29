@@ -1,9 +1,12 @@
 """
-Geolocalización de IPs con caché.
+Geolocalización de IPs (país).
 
-- IPs privadas/loopback: no se consultan afuera. Por defecto quedan como ubicación
-  desconocida; LOCAL_IP_COUNTRY permite asignarles un país en desarrollo.
-- GEOIP_PROVIDER=none desactiva la consulta externa (minimización de datos, RNF-N2).
+- GEOIP_PROVIDER=local (por defecto): base GeoLite2 incluida en el paquete geoip2fast.
+  No depende de un servicio externo y la IP del usuario no sale del servidor (RNF-N2).
+- GEOIP_PROVIDER=ipapi: consulta ipapi.co (da ciudad, pero en Render responde 429 porque
+  la IP de salida es compartida y la cuota gratuita está agotada).
+- GEOIP_PROVIDER=none: sin geolocalización.
+- IPs privadas/loopback: ubicación desconocida, o LOCAL_IP_COUNTRY en desarrollo.
 """
 import ipaddress
 import logging
@@ -18,6 +21,7 @@ from config import settings
 logger = logging.getLogger(__name__)
 
 _cache: Dict[str, tuple] = {}
+_local_db = None
 _lock = threading.Lock()
 _MAX_ENTRIES = 5000
 
@@ -45,7 +49,10 @@ def lookup(ip: str) -> Dict[str, str]:
                     "display": "Red local (desarrollo)"}
         return _unknown(ip, "Red privada")
 
-    if settings.GEOIP_PROVIDER.lower() != "ipapi":
+    provider = settings.GEOIP_PROVIDER.lower()
+    if provider == "local":
+        return _lookup_local(ip)
+    if provider != "ipapi":
         return _unknown(ip)
 
     now = time.time()
@@ -76,3 +83,30 @@ def lookup(ip: str) -> Dict[str, str]:
             _cache.clear()
         _cache[ip] = (now, result)
     return result
+
+
+def _local():
+    """Carga perezosa de la base local (~0,1 s, ~60 MB en memoria con IPv6)."""
+    global _local_db
+    if _local_db is None:
+        with _lock:
+            if _local_db is None:
+                import warnings
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", SyntaxWarning)
+                    from geoip2fast import GeoIP2Fast
+                _local_db = GeoIP2Fast(geoip2fast_data_file="geoip2fast-ipv6.dat.gz", verbose=False)
+    return _local_db
+
+
+def _lookup_local(ip: str) -> Dict[str, str]:
+    try:
+        r = _local().lookup(ip)
+    except Exception as e:
+        logger.warning("[GEOLOCATION] Base local sin datos: %s", type(e).__name__)
+        return _unknown(ip)
+    code = getattr(r, "country_code", "") or ""
+    if len(code) != 2 or not code.isalpha():  # "--" = no encontrada / privada
+        return _unknown(ip)
+    name = getattr(r, "country_name", code) or code
+    return {"country": code, "country_name": name, "city": "Unknown", "display": name}
