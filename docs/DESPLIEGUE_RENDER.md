@@ -63,3 +63,15 @@ Si queda mal, el sistema no se rompe: ve una ubicación desconocida y pide step-
 | El link de invitación apunta a otro dominio | `ORIGIN` o `FRONTEND_URL` mal | Corregir y reemitir la invitación |
 | Falla el build del backend | Versión de Python | `.python-version` fija 3.13; Render ignora `runtime.txt` |
 | El frontend llama a una URL vieja | `REACT_APP_API_URL` se fija al compilar | Corregirla y redesplegar el frontend |
+
+## Estado del despliegue actual
+
+| Recurso | URL / ID | Plan |
+|---|---|---|
+| Frontend | https://zuy-tfg-passkeys.onrender.com | Sitio estático |
+| Backend | https://zuy-tfg-passkeys-api.onrender.com (`srv-dbhruckipgvc73dj9hfg`) | `0.5c-512mb` |
+| Base de datos | `zuy-tfg-passkeys-db` (`dpg-dbhru0ei0phs73d59p70-a`) | `0.1c-256mb`, 15 GB de disco |
+
+- Creados con el conector de Render (no con Blueprint). `DATABASE_URL` se cargó a mano desde el dashboard.
+- El conector no configura reglas de reescritura del sitio estático: las rutas de la SPA se resuelven con copias de `index.html` generadas en el build (`frontend/scripts/spa-routes.js`).
+- Despliegue automático: la app de Render en GitHub tiene acceso a este repo, así que cada push a `main` despliega frontend y backend.
