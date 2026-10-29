@@ -17,6 +17,7 @@ function AdminUsers({ currentUser }) {
   const [invitation, setInvitation] = useState(null);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [busy, setBusy] = useState(false);
+  const [diag, setDiag] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -80,6 +81,15 @@ function AdminUsers({ currentUser }) {
     role: (u, role) => run(() => api.put(`/admin/users/${u.id}/role`, { role }).then((r) => r.data), 'Rol actualizado'),
     approve: (req) => run(() => post(`/admin/stepup/${req.id}/approve`), `Acceso de ${req.user.email} aprobado`),
     deny: (req) => run(() => post(`/admin/stepup/${req.id}/deny`), `Acceso de ${req.user.email} rechazado`)
+  };
+
+  const runDiagnostics = async () => {
+    try {
+      const { data } = await api.get('/admin/diagnostics/client-ip');
+      setDiag(data);
+    } catch (error) {
+      setMessage({ type: 'error', text: errorMessage(error, 'No se pudo obtener el diagnóstico') });
+    }
   };
 
   const copy = (text) => navigator.clipboard?.writeText(text).then(
@@ -199,6 +209,25 @@ function AdminUsers({ currentUser }) {
             );
           })}
         </div>
+      </section>
+
+      <section className="au-section">
+        <h3>🌐 Diagnóstico de red</h3>
+        <p className="au-hint">
+          Verifica que el servidor vea tu IP pública real detrás del proxy (configuración TRUSTED_PROXY_HOPS).
+        </p>
+        <button className="btn-secondary" onClick={runDiagnostics}>Ver qué IP detecta el servidor</button>
+        {diag && (
+          <div className="au-card" style={{ marginTop: 12 }}>
+            <p className="au-meta"><strong>IP detectada:</strong> {diag.resolved_client_ip}
+              {' '}· {diag.geolocation?.display}</p>
+            <p className="au-ua">
+              Conexión: {diag.connection_ip} · X-Forwarded-For: {diag.x_forwarded_for || '(vacío)'}
+              {' '}· Saltos de confianza: {diag.trusted_proxy_hops}
+            </p>
+            <p className="au-hint">{diag.hint}</p>
+          </div>
+        )}
       </section>
     </div>
   );

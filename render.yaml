@@ -1,10 +1,21 @@
+# Despliegue en Render (Blueprint). Ver docs/DESPLIEGUE_RENDER.md
+#
+# La URL pública de cada servicio sale de su nombre (<nombre>.onrender.com). Si Render asigna
+# otra (por ejemplo, con un sufijo porque el nombre ya estaba tomado), actualizar:
+#   - RP_ID / ORIGIN: dominio del FRONTEND (donde el navegador crea y usa la passkey)
+#   - REACT_APP_API_URL: URL pública del BACKEND
+# Las passkeys quedan atadas a RP_ID: si después cambia el dominio, hay que volver a enrolarlas.
+
 services:
-  # Backend FastAPI
+  # Backend FastAPI — plan pago: no se apaga por inactividad (el gratuito se duerme a los 15 min)
   - type: web
-    name: auth-backend
+    name: zuy-tfg-passkeys-api
     runtime: python
+    region: virginia
+    plan: 0.5c-512mb
     buildCommand: pip install -r backend/requirements.txt
     startCommand: cd backend && python init_db.py && uvicorn app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -14,36 +25,50 @@ services:
         generateValue: true
       - key: JWT_SECRET
         generateValue: true
-      # RP_ID = dominio del FRONTEND (no del backend): es donde el navegador crea y usa la passkey
+      # RP_ID = dominio del FRONTEND, sin https:// ni barra final
       - key: RP_ID
-        value: changeme-frontend-url.onrender.com
+        value: zuy-tfg-passkeys.onrender.com
       - key: RP_NAME
         value: Prototipo Auth TFG
       - key: ORIGIN
-        value: https://changeme-frontend-url.onrender.com
+        value: https://zuy-tfg-passkeys.onrender.com
       # Si no hay administradores, el log del primer arranque muestra el link de invitación
+      # sync: false = Render lo pide al crear el Blueprint y no queda escrito en el repo (que es público)
       - key: BOOTSTRAP_ADMIN_EMAIL
-        value: changeme@empresa.com
-      # Render agrega la IP del cliente al final de X-Forwarded-For. Confirmar con
-      # GET /admin/diagnostics/client-ip después del primer despliegue y ajustar si hace falta.
+        sync: false
+      # Confirmar con GET /admin/diagnostics/client-ip después del primer despliegue
       - key: TRUSTED_PROXY_HOPS
         value: "1"
-    healthCheckPath: /health
-    plan: free
 
-  # Frontend React
+  # Frontend React como sitio estático (gratis, no se apaga)
   - type: web
-    name: auth-frontend
-    runtime: node
-    buildCommand: cd frontend && npm install && npm run build
-    startCommand: cd frontend && npx serve -s build -l $PORT
+    name: zuy-tfg-passkeys
+    runtime: static
+    buildCommand: cd frontend && npm ci && npm run build
+    staticPublishPath: ./frontend/build
     envVars:
       - key: REACT_APP_API_URL
-        value: https://changeme-backend-url.onrender.com
-    plan: free
+        value: https://zuy-tfg-passkeys-api.onrender.com
+    routes:
+      # Aplicación de una sola página: toda ruta (/login, /enroll?invite=...) sirve index.html
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: no-referrer
 
 databases:
+  # Plan pago: el gratuito vence a los 30 días y se borra
   - name: auth-postgres
     databaseName: auth_passkeys
     user: authuser
-    plan: free
+    region: virginia
+    plan: 0.1c-256mb
