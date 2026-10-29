@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import '../styles/AuditReports.css';
 import api from '../services/api';
 
+// El input datetime-local está en hora local del navegador: se envía con zona (UTC) al backend
+const toUtcIso = (value) => (value ? new Date(value).toISOString() : null);
+
 const AuditReports = () => {
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -38,8 +41,8 @@ const AuditReports = () => {
     
     try {
       const { data } = await api.post('/api/audit/reports/aggregated', {
-        start_date: filters.start_date || null,
-        end_date: filters.end_date || null,
+        start_date: toUtcIso(filters.start_date),
+        end_date: toUtcIso(filters.end_date),
         event_types: filters.event_types.length > 0 ? filters.event_types : null,
         limit: filters.limit
       });
@@ -59,8 +62,8 @@ const AuditReports = () => {
       const exportRequest = {
         format: format,
         filters: {
-          start_date: filters.start_date || null,
-          end_date: filters.end_date || null,
+          start_date: toUtcIso(filters.start_date),
+          end_date: toUtcIso(filters.end_date),
           event_types: filters.event_types.length > 0 ? filters.event_types : null,
           limit: filters.limit
         }
@@ -338,18 +341,24 @@ const AuditReports = () => {
             <div className="hourly-distribution">
               <h4>Distribución por Hora del Día (hora de Buenos Aires)</h4>
               <div className="chart-container">
-                {reportData.hourly_distribution.map(item => (
-                  <div key={item.hour} className="chart-bar">
-                    <div 
-                      className="bar" 
-                      style={{ 
-                        height: `${(item.count / Math.max(...reportData.hourly_distribution.map(h => h.count))) * 100}%` 
-                      }}
-                      title={`${item.hour}:00 - ${item.count} eventos`}
-                    />
-                    <div className="bar-label">{item.hour}h</div>
-                  </div>
-                ))}
+                {(() => {
+                  // Las 24 horas, con cero donde no hubo eventos, para ver en qué franja se concentra la actividad
+                  const counts = Object.fromEntries(reportData.hourly_distribution.map(h => [h.hour, h.count]));
+                  const max = Math.max(1, ...reportData.hourly_distribution.map(h => h.count));
+                  return Array.from({ length: 24 }, (_, hour) => {
+                    const count = counts[hour] || 0;
+                    return (
+                      <div key={hour} className="chart-bar" title={`${hour}:00 – ${count} eventos`}>
+                        <div className="bar-count">{count > 0 ? count : ''}</div>
+                        <div
+                          className={`bar ${count === 0 ? 'empty' : ''}`}
+                          style={{ height: `${Math.round((count / max) * 140)}px` }}
+                        />
+                        <div className="bar-label">{hour % 3 === 0 ? `${hour}h` : ''}</div>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </div>
           )}

@@ -7,9 +7,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_, desc, asc, create_engine
 from sqlalchemy.orm import sessionmaker
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+import pytz
 import csv
 import json
 import io
@@ -57,6 +58,15 @@ class ReportFilters(BaseModel):
     sort_by: Optional[str] = "timestamp"
     sort_order: Optional[str] = "desc"
 
+    @field_validator("start_date", "end_date")
+    @classmethod
+    def _to_naive_utc(cls, value: Optional[datetime]) -> Optional[datetime]:
+        # La auditoría se guarda en UTC sin zona. Una fecha con zona (la que manda el
+        # frontend) se convierte a UTC; una sin zona se toma como UTC.
+        if value is not None and value.tzinfo is not None:
+            value = value.astimezone(timezone.utc).replace(tzinfo=None)
+        return value
+
 
 class AggregatedReport(BaseModel):
     """Modelo para reportes agregados"""
@@ -83,6 +93,11 @@ class ExportRequest(BaseModel):
 # ============================================
 # FUNCIONES AUXILIARES
 # ============================================
+
+def _local(ts: datetime) -> str:
+    """UTC sin zona → texto en hora de Buenos Aires."""
+    return ts.replace(tzinfo=timezone.utc).astimezone(pytz.timezone(LOCAL_TZ)).strftime("%d/%m/%Y %H:%M")
+
 
 def apply_filters(query, filters: ReportFilters):
     """Aplica filtros avanzados a una consulta de auditoría"""
@@ -312,28 +327,25 @@ async def generate_aggregated_report(
         
         # Métricas básicas
         total_events = base_query.count()
-        unique_users = db.query(func.count(func.distinct(AuditEvent.user_id))).filter(
-            AuditEvent.timestamp >= start,
-            AuditEvent.timestamp <= end
-        ).scalar() or 0
+        # Mismos filtros que el total: las cifras del reporte tienen que ser comparables
+        unique_users = base_query.with_entities(
+            func.count(func.distinct(AuditEvent.user_id))
+        ).filter(AuditEvent.user_id.isnot(None)).scalar() or 0
         
         total_logins = base_query.filter(AuditEvent.event_type == EV_LOGIN_SUCCESS).count()
         failed_logins = base_query.filter(AuditEvent.event_type == EV_LOGIN_FAILED).count()
         stepup_challenges = base_query.filter(AuditEvent.event_type == EV_STEPUP).count()
         
         # Eventos de alto riesgo
-        high_risk_query = db.query(func.count(RiskEvaluation.id)).filter(
-            RiskEvaluation.evaluated_at >= start,
-            RiskEvaluation.evaluated_at <= end,
-            RiskEvaluation.risk_score >= settings.RISK_THRESHOLD_HIGH
-        )
-        high_risk_events = high_risk_query.scalar() or 0
+        risk_filter = [RiskEvaluation.evaluated_at >= start, RiskEvaluation.evaluated_at <= end]
+        if filters and filters.user_ids:
+            risk_filter.append(RiskEvaluation.user_id.in_(filters.user_ids))
+        high_risk_events = db.query(func.count(RiskEvaluation.id)).filter(
+            *risk_filter, RiskEvaluation.risk_score >= settings.RISK_THRESHOLD_HIGH
+        ).scalar() or 0
         
         # Score de riesgo promedio
-        avg_risk = db.query(func.avg(RiskEvaluation.risk_score)).filter(
-            RiskEvaluation.evaluated_at >= start,
-            RiskEvaluation.evaluated_at <= end
-        ).scalar() or 0
+        avg_risk = db.query(func.avg(RiskEvaluation.risk_score)).filter(*risk_filter).scalar() or 0
         
         # Desglose por tipo de evento
         event_breakdown = {}
@@ -346,12 +358,10 @@ async def generate_aggregated_report(
             event_breakdown[event_type] = count
         
         # Top IPs
-        top_ips_query = db.query(
+        top_ips_query = base_query.with_entities(
             AuditEvent.ip_address,
             func.count(AuditEvent.id).label('count')
         ).filter(
-            AuditEvent.timestamp >= start,
-            AuditEvent.timestamp <= end,
             AuditEvent.ip_address.isnot(None)
         ).group_by(AuditEvent.ip_address).order_by(desc('count')).limit(10)
         
@@ -374,7 +384,7 @@ async def generate_aggregated_report(
         ]
         
         return AggregatedReport(
-            period=f"{start.isoformat()} - {end.isoformat()}",
+            period=f"{_local(start)} – {_local(end)} (hora de Buenos Aires)",
             total_events=total_events,
             unique_users=unique_users,
             total_logins=total_logins,

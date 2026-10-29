@@ -434,3 +434,63 @@
   color: white;
   transform: translateX(-5px);
 }
+
+/* Tarjetas del resumen: otras hojas definen .stat-value/.stat-label con texto oscuro.
+   Se fija texto blanco con selectores propios y un verde más oscuro para que se lea. */
+.stats-summary .stat-card {
+  display: block;
+  color: #fff;
+  background: linear-gradient(135deg, #4f5fd6 0%, #5e3a8f 100%);
+}
+
+.stats-summary .stat-card.success-rate {
+  background: linear-gradient(135deg, #0b6e5f 0%, #149a6a 100%);
+}
+
+.stats-summary .stat-value {
+  color: #fff;
+  opacity: 1;
+}
+
+.stats-summary .stat-label {
+  color: #fff;
+  opacity: 0.95;
+  font-weight: 600;
+}
+
+/* Distribución horaria: 24 barras con altura en píxeles (el % no funcionaba sin alto fijo) */
+.hourly-distribution .chart-container {
+  height: auto;
+  min-height: 200px;
+  justify-content: space-between;
+  gap: 2px;
+  padding: 16px 12px;
+}
+
+.hourly-distribution .chart-bar {
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.hourly-distribution .bar {
+  width: 70%;
+  min-height: 0;
+}
+
+.hourly-distribution .bar.empty {
+  height: 2px !important;
+  background: #dde1f0;
+}
+
+.hourly-distribution .bar-count {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #4f5fd6;
+  min-height: 1em;
+  margin-bottom: 3px;
+}
+
+.hourly-distribution .bar-label {
+  min-height: 1em;
+  font-size: 0.72rem;
+}
