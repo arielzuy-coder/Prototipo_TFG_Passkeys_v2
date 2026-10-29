@@ -129,7 +129,8 @@ class RiskEngine:
         logger.info(f"[RISK ENGINE] Buscando device_fingerprint: {device_fingerprint}")
         
         known_device = db.query(Device).filter(
-            Device.device_fingerprint == device_fingerprint
+            Device.device_fingerprint == device_fingerprint,
+            Device.user_id == context['user_id']
         ).first()
         
         if known_device:

@@ -1,23 +1,80 @@
 """
 Script de inicialización de base de datos para producción en Render
 """
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
-from models import Base, Policy
+from models import Base, Policy, User
 from config import settings
+from database import engine
 import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Placeholder que la v1 guardaba como "clave pública" de todas las passkeys
+_MOCK_PUBLIC_KEY = "bW9ja19wdWJsaWNfa2V5X2J5dGVz"
+
+MIGRATIONS = [
+    # v2: roles, rotación de refresh y metadatos reales de la passkey
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'user'",
+    "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS refresh_jti_hash VARCHAR(64)",
+    "ALTER TABLE passkeys ADD COLUMN IF NOT EXISTS backed_up BOOLEAN DEFAULT FALSE",
+    "ALTER TABLE passkeys ADD COLUMN IF NOT EXISTS transports JSON",
+    # Las passkeys de la v1 no tienen clave pública real: no se pueden verificar.
+    f"DELETE FROM passkeys WHERE public_key = '{_MOCK_PUBLIC_KEY}'",
+    # Usuarios activos sin ninguna passkey válida quedan pendientes de re-enrolamiento
+    "UPDATE users SET status = 'pending' WHERE status = 'active' "
+    "AND NOT EXISTS (SELECT 1 FROM passkeys p WHERE p.user_id = users.id)",
+]
+
+
+def migrate_schema():
+    """Migraciones idempotentes para bases creadas con la v1 (create_all no altera tablas existentes)."""
+    with engine.begin() as conn:
+        for stmt in MIGRATIONS:
+            conn.execute(text(stmt))
+    logger.info("✅ Migraciones aplicadas")
+
+
+def bootstrap_admin(session):
+    """
+    Si no hay ningún administrador y BOOTSTRAP_ADMIN_EMAIL está definido, crea el usuario
+    y escribe en el log un link de invitación de un solo uso para enrolar su passkey.
+    """
+    from services.common import create_invitation, normalize_email
+
+    if session.query(User).filter(User.role == "admin", User.status != "suspended").count() > 0:
+        return
+    if not settings.BOOTSTRAP_ADMIN_EMAIL:
+        logger.warning("No hay administradores. Definí BOOTSTRAP_ADMIN_EMAIL o usá create_invitation.py")
+        return
+    email = normalize_email(settings.BOOTSTRAP_ADMIN_EMAIL)
+    user = session.query(User).filter(User.email == email).first()
+    if user is None:
+        user = User(email=email, display_name=email.split("@")[0], role="admin", status="pending")
+        session.add(user)
+    else:
+        user.role = "admin"
+        if user.status != "active":
+            user.status = "pending"
+    session.commit()
+    session.refresh(user)
+    if user.status == "active":
+        return
+    inv = create_invitation(session, user, "enroll")
+    logger.warning("=" * 70)
+    logger.warning("Invitación de administrador inicial para %s (vence %s):", email, inv["expires_at"])
+    logger.warning("%s", inv["url"])
+    logger.warning("=" * 70)
+
+
 def init_database():
     """Inicializa la base de datos creando tablas y datos iniciales"""
     try:
-        engine = create_engine(settings.DATABASE_URL)
-        
         # Crear todas las tablas
         logger.info("Creando tablas de base de datos...")
         Base.metadata.create_all(bind=engine)
+        migrate_schema()
         logger.info("✅ Tablas creadas exitosamente")
         
         # Crear sesión
@@ -81,6 +138,8 @@ def init_database():
             else:
                 logger.info(f"Base de datos ya tiene {count} políticas, omitiendo inserción")
         
+            bootstrap_admin(session)
+
         finally:
             session.close()
         

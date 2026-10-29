@@ -18,24 +18,18 @@ from fastapi.responses import StreamingResponse
 import logging
 
 from models import AuditEvent, User, Session as DBSession, RiskEvaluation, Passkey
-from config import settings
+from auth.deps import require_audit_reader
+from database import get_db
 
 # Configurar logging
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/audit", tags=["Auditoría y Reportes"])
+# UC-06: solo administradores y auditores (Tabla 4 de la tesis)
+router = APIRouter(prefix="/api/audit", tags=["Auditoría y Reportes"],
+                   dependencies=[Depends(require_audit_reader)])
 
-# Configurar la base de datos independientemente
-engine = create_engine(settings.DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Dependency para obtener DB session
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+
 
 
 # ============================================
@@ -265,7 +259,7 @@ async def export_audit_data(
     
     except Exception as e:
         logger.error(f"Error al exportar datos: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error al exportar datos: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error al exportar datos")
 
 
 # ============================================
@@ -393,7 +387,7 @@ async def generate_aggregated_report(
     
     except Exception as e:
         logger.error(f"Error al generar reporte agregado: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error al generar reporte agregado: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error al generar reporte agregado")
 
 
 # ============================================
@@ -446,7 +440,7 @@ async def search_audit_events(
     
     except Exception as e:
         logger.error(f"Error en búsqueda de eventos: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error en búsqueda de eventos: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error en búsqueda de eventos")
 
 
 @router.get("/statistics/summary")
@@ -495,7 +489,7 @@ async def get_statistics_summary(
     
     except Exception as e:
         logger.error(f"Error al obtener estadísticas: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error al obtener estadísticas: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error al obtener estadísticas")
 
 
 # ============================================
@@ -549,4 +543,4 @@ async def get_compliance_access_log(
     
     except Exception as e:
         logger.error(f"Error al generar log de cumplimiento: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error al generar log de cumplimiento: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error al generar log de cumplimiento")
