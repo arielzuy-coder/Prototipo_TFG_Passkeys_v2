@@ -1,0 +1,24 @@
+# Secrets
+.env
+*.pem
+*.key
+nginx/ssl/
+
+# Docker
+*.log
+postgres_data/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# Node
+node_modules/
+build/
+.DS_Store
+
+# IDE
+.vscode/
+.idea/

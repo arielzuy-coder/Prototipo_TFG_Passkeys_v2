@@ -1,0 +1,41 @@
+services:
+  # Backend FastAPI
+  - type: web
+    name: auth-backend
+    runtime: python
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && python init_db.py && uvicorn app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: auth-postgres
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET
+        generateValue: true
+      - key: RP_ID
+        value: changeme-backend-url.onrender.com
+      - key: RP_NAME
+        value: Prototipo Auth TFG
+      - key: ORIGIN
+        value: https://changeme-frontend-url.onrender.com
+    healthCheckPath: /health
+    plan: free
+
+  # Frontend React
+  - type: web
+    name: auth-frontend
+    runtime: node
+    buildCommand: cd frontend && npm install && npm run build
+    startCommand: cd frontend && npx serve -s build -l $PORT
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://changeme-backend-url.onrender.com
+    plan: free
+
+databases:
+  - name: auth-postgres
+    databaseName: auth_passkeys
+    user: authuser
+    plan: free
