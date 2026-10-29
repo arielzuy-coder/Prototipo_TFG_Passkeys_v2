@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import api, { errorMessage } from '../services/api';
+import { useNotifier } from './Notifier';
 import '../styles/Security_v2.css';
 
 const ROLE_LABELS = { user: 'Usuario estándar', auditor: 'Auditor de seguridad', admin: 'Administrador' };
@@ -11,6 +12,7 @@ const STATUS_LABELS = { active: 'Activo', pending: 'Pendiente de enrolar', suspe
  * aprobación manual de step-up por supervisor.
  */
 function AdminUsers({ currentUser }) {
+  const { confirm } = useNotifier();
   const [users, setUsers] = useState([]);
   const [pending, setPending] = useState([]);
   const [form, setForm] = useState({ email: '', display_name: '', role: 'user' });
@@ -68,13 +70,25 @@ function AdminUsers({ currentUser }) {
 
   const actions = {
     reinvite: (u) => run(() => post(`/admin/users/${u.id}/invitation`), 'Invitación reemitida'),
-    recovery: (u) => {
-      if (!window.confirm(`Recuperación de ${u.email}: se revocan TODAS sus passkeys y sesiones y se emite `
-        + 'una invitación de re-enrolamiento. Verificá antes la identidad del titular. ¿Continuar?')) return;
+    recovery: async (u) => {
+      const ok = await confirm({
+        title: `Recuperación de ${u.email}`,
+        message: 'Se revocan TODAS sus passkeys y sesiones y se emite una invitación de re-enrolamiento. '
+          + 'Verificá antes la identidad del titular por un canal independiente.',
+        confirmLabel: 'Iniciar recuperación',
+        danger: true
+      });
+      if (!ok) return;
       run(() => post(`/admin/users/${u.id}/recovery`), 'Passkeys revocadas. Entregá el link de recuperación.');
     },
-    suspend: (u) => {
-      if (!window.confirm(`¿Suspender a ${u.email}? Se cierran todas sus sesiones.`)) return;
+    suspend: async (u) => {
+      const ok = await confirm({
+        title: `¿Suspender a ${u.email}?`,
+        message: 'Se cierran todas sus sesiones y no podrá iniciar sesión hasta que lo reactives.',
+        confirmLabel: 'Suspender',
+        danger: true
+      });
+      if (!ok) return;
       run(() => post(`/admin/users/${u.id}/suspend`), 'Usuario suspendido');
     },
     reactivate: (u) => run(() => post(`/admin/users/${u.id}/reactivate`), 'Usuario reactivado'),

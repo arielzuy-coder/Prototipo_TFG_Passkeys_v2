@@ -3,6 +3,18 @@ import api, { errorMessage } from '../services/api';
 import { stepUpWithPasskey } from '../services/webauthn';
 import '../styles/Security_v2.css';
 
+const FACTOR_LABELS = {
+  device: 'Dispositivo',
+  location: 'Ubicación',
+  time: 'Horario',
+  failed_attempts: 'Intentos fallidos',
+  velocity: 'Frecuencia de accesos'
+};
+
+const LEVEL_LABELS = { low: 'BAJO', medium: 'MEDIO', high: 'ALTO' };
+
+const fmtPts = (n) => (Number.isFinite(n) ? n.toLocaleString('es-AR', { maximumFractionDigits: 1 }) : '–');
+
 const METHOD_LABELS = {
   passkey: '👆 Passkey (biometría / PIN)',
   otp: '📧 Código por email',
@@ -121,7 +133,27 @@ function StepUpChallenge({ stepupData, onSuccess, onCancel }) {
 
   const riskScore = stepupData.risk_assessment?.score ?? 0;
   const riskLevel = stepupData.risk_assessment?.level || 'medium';
-  const factors = stepupData.risk_assessment?.factors || {};
+  const assessment = stepupData.risk_assessment || {};
+  const factors = assessment.factors || {};
+  const thresholds = assessment.thresholds || { low: 40, high: 75 };
+  const factorRows = Object.entries(factors)
+    .map(([key, value]) => ({
+      key,
+      label: FACTOR_LABELS[key] || key,
+      message: value?.message || '',
+      points: typeof value?.points === 'number' ? value.points : null
+    }))
+    .sort((a, b) => (b.points ?? 0) - (a.points ?? 0));
+  const computedScore = typeof assessment.computed_score === 'number'
+    ? assessment.computed_score
+    : factorRows.reduce((sum, f) => sum + (f.points ?? 0), 0);
+  const policyText = assessment.policy?.description || assessment.policy?.name;
+  // Se muestra el puntaje calculado por el motor; el nivel sale de ese puntaje y los umbrales.
+  // Si el puntaje es bajo y aun así se pide step-up, lo explica la política aplicada.
+  const shownScore = factorRows.length ? computedScore : riskScore;
+  const shownLevel = factorRows.length
+    ? (shownScore >= thresholds.high ? 'high' : shownScore >= thresholds.low ? 'medium' : 'low')
+    : riskLevel;
   const expired = timeLeft <= 0;
 
   return (
@@ -129,21 +161,38 @@ function StepUpChallenge({ stepupData, onSuccess, onCancel }) {
       <div className="stepup-card">
         <div className="stepup-header">
           <h2>🔐 Verificación adicional requerida</h2>
-          <div className={`risk-badge risk-${riskLevel}`}>
-            Nivel de riesgo: {riskLevel.toUpperCase()} ({riskScore}/100)
+          <div className={`risk-badge risk-${shownLevel}`}>
+            Nivel de riesgo: {LEVEL_LABELS[shownLevel] || shownLevel.toUpperCase()} ({fmtPts(shownScore)}/100)
           </div>
         </div>
 
         <div className="stepup-info">
-          <p>Detectamos condiciones inusuales en este acceso. Por tu seguridad, confirmá tu identidad.</p>
-          {Object.keys(factors).length > 0 && (
+          <p>Tu passkey es válida, pero el contexto de este acceso requiere una verificación más.</p>
+          {factorRows.length > 0 && (
             <div className="risk-factors">
-              <h4>Factores detectados:</h4>
-              <ul>
-                {Object.entries(factors).map(([key, value]) => (
-                  <li key={key}>{value?.message || key}</li>
-                ))}
-              </ul>
+              <h4>¿Por qué se pide? Evaluación del motor de riesgo</h4>
+              <table className="risk-breakdown">
+                <thead>
+                  <tr><th>Factor</th><th>Detalle</th><th className="pts">Puntos</th></tr>
+                </thead>
+                <tbody>
+                  {factorRows.map((f) => (
+                    <tr key={f.key} className={f.points > 0 ? 'hit' : ''}>
+                      <td>{f.label}</td>
+                      <td>{f.message}</td>
+                      <td className="pts">{f.points === null ? '–' : `+${fmtPts(f.points)}`}</td>
+                    </tr>
+                  ))}
+                  <tr className="total">
+                    <td colSpan="2">Puntaje de riesgo</td>
+                    <td className="pts">{fmtPts(computedScore)}/100</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p className="risk-scale">
+                Escala: bajo &lt; {thresholds.low} · medio {thresholds.low}–{thresholds.high - 1} · alto ≥ {thresholds.high}
+              </p>
+              {policyText && <p className="risk-policy">Política aplicada: <strong>{policyText}</strong></p>}
             </div>
           )}
         </div>

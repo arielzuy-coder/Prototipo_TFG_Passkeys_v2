@@ -223,6 +223,11 @@ def test_H5_stepup_response_has_no_otp_and_passkey_stepup_works(client, risk):
     assert body["requires_stepup"] is True and "tokens" not in body
     assert "otp" not in json.dumps(body).lower().replace("verification_methods", "")
     assert "otp" not in body["verification_methods"]  # SMTP no configurado
+    # La pantalla de step-up explica la decisión: puntaje, umbrales y política aplicada
+    assessment = body["risk_assessment"]
+    assert assessment["computed_score"] == 55.0
+    assert assessment["thresholds"] == {"low": 40, "high": 75}
+    assert assessment["policy"]["name"] == "test_stepup"
 
     token = body["stepup_token"]
     opts = client.post("/auth/stepup/passkey/begin", json={"stepup_token": token})

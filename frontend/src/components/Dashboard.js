@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api, { errorMessage } from '../services/api';
+import { useNotifier } from './Notifier';
 import '../styles/Security_v2.css';
 
 function Dashboard({ user, onLogout }) {
   const navigate = useNavigate();
+  const { notify, confirm } = useNotifier();
   const [passkeys, setPasskeys] = useState([]);
   const [auditEvents, setAuditEvents] = useState([]);
   const [sessions, setSessions] = useState([]);
@@ -69,27 +71,38 @@ function Dashboard({ user, onLogout }) {
     setLoading(false);
   };
 
-  const handleRevokePasskey = async (passkeyId) => {
-    if (!window.confirm('¿Estás seguro de revocar esta Passkey? Esta acción no se puede deshacer.')) {
-      return;
-    }
+  const handleRevokePasskey = async (passkey) => {
+    const ok = await confirm({
+      title: `¿Revocar la passkey "${passkey.device_name}"?`,
+      message: 'Dejará de servir para iniciar sesión en este sistema. Esta acción no se puede deshacer.',
+      confirmLabel: 'Revocar',
+      danger: true
+    });
+    if (!ok) return;
 
     try {
-      await api.delete(`/passkeys/${passkeyId}`);
-      alert('✅ Passkey revocada exitosamente');
+      await api.delete(`/passkeys/${passkey.id}`);
+      notify(`Passkey "${passkey.device_name}" revocada`, 'success');
       loadDashboardData();
     } catch (error) {
-      alert(`❌ Error: ${errorMessage(error)}`);
+      notify(errorMessage(error), 'error');
     }
   };
 
   const handleRevokeSession = async (sessionId) => {
-    if (!window.confirm('¿Cerrar esa sesión? El dispositivo tendrá que volver a iniciar sesión.')) return;
+    const ok = await confirm({
+      title: '¿Cerrar esa sesión?',
+      message: 'El dispositivo tendrá que volver a iniciar sesión.',
+      confirmLabel: 'Cerrar sesión',
+      danger: true
+    });
+    if (!ok) return;
     try {
       await api.delete(`/me/sessions/${sessionId}`);
       setSessions(sessions.filter((s) => s.id !== sessionId));
+      notify('Sesión cerrada', 'success');
     } catch (error) {
-      alert(`❌ Error: ${errorMessage(error)}`);
+      notify(errorMessage(error), 'error');
     }
   };
 
@@ -106,8 +119,9 @@ function Dashboard({ user, onLogout }) {
       ));
       setEditingPasskey(null);
       setNewName('');
+      notify('Nombre actualizado', 'success');
     } catch (error) {
-      alert(`❌ Error: ${errorMessage(error)}`);
+      notify(errorMessage(error), 'error');
     }
   };
 
@@ -412,12 +426,19 @@ function Dashboard({ user, onLogout }) {
                       </div>
 
                       <div className="passkey-card-footer">
-                        <button 
+                        <button
                           className="btn-revoke"
-                          onClick={() => handleRevokePasskey(passkey.id)}
+                          onClick={() => handleRevokePasskey(passkey)}
+                          disabled={passkeys.length <= 1}
+                          title={passkeys.length <= 1 ? 'Es tu única passkey: agregá otra antes de revocarla' : ''}
                         >
                           🗑️ Revocar Passkey
                         </button>
+                        {passkeys.length <= 1 && (
+                          <p className="revoke-hint">
+                            Es tu única passkey. Agregá otra antes de revocarla para no perder el acceso.
+                          </p>
+                        )}
                       </div>
                     </div>
                   ))}

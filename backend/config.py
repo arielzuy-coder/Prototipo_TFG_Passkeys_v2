@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     RISK_THRESHOLD_LOW: int = 40
     RISK_THRESHOLD_HIGH: int = 75
     TRUSTED_COUNTRIES: str = "AR"  # países de bajo riesgo, separados por coma
+    # Horario laboral (hora de Buenos Aires). Fuera de él el factor "horario" suma riesgo.
+    BUSINESS_HOURS_START: str = "08:00"
+    BUSINESS_HOURS_END: str = "19:00"
+    BUSINESS_WEEKDAYS_ONLY: bool = True  # sábados y domingos cuentan como fuera de horario
 
     # IP del cliente detrás de un proxy (Render, nginx, etc.)
     # TRUSTED_PROXY_HOPS = cantidad de proxies propios delante de la app que agregan a X-Forwarded-For.

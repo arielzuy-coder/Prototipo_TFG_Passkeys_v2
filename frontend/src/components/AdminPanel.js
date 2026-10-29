@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import api, { errorMessage } from '../services/api';
 import AuditReports from './AuditReports';
 import AdminUsers from './AdminUsers';
+import { useNotifier } from './Notifier';
 
 function AdminPanel({ user }) {
+  const { confirm } = useNotifier();
   const [policies, setPolicies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState({ type: '', text: '' });
@@ -146,9 +148,13 @@ function AdminPanel({ user }) {
   };
 
   const handleDelete = async (policy) => {
-    if (!window.confirm(`¿Eliminar la política "${policy.name}"?`)) {
-      return;
-    }
+    const ok = await confirm({
+      title: `¿Eliminar la política "${policy.name}"?`,
+      message: 'El motor de riesgo dejará de aplicarla en los próximos accesos.',
+      confirmLabel: 'Eliminar',
+      danger: true
+    });
+    if (!ok) return;
 
     try {
       await api.delete(`/admin/policies/${policy.id}`);

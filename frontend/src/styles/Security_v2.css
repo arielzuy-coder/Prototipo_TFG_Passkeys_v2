@@ -277,3 +277,93 @@
 .sessions-list .au-card.current {
   border-left: 4px solid #667eea;
 }
+
+/* ---------- Avisos dentro de la app (reemplazan alert) ---------- */
+.toast-stack {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: min(420px, calc(100vw - 32px));
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #fff;
+  border-left: 5px solid #667eea;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+  color: #333;
+  font-size: 0.95rem;
+  text-align: left;
+  animation: toast-in 0.2s ease-out;
+}
+
+.toast-success { border-left-color: #28a745; }
+.toast-error { border-left-color: #dc3545; }
+.toast-text { flex: 1; line-height: 1.35; }
+.toast-close {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #888;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---------- Revocar deshabilitado con una sola passkey ---------- */
+.btn-revoke:disabled,
+.btn-revoke:disabled:hover {
+  background: #f1f1f1;
+  color: #999;
+  border-color: #ccc;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.revoke-hint {
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+  color: #666;
+  text-align: center;
+}
+
+/* ---------- Detalle del motor de riesgo en el step-up ---------- */
+.risk-breakdown {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0 6px;
+  font-size: 0.9rem;
+  text-align: left;
+}
+
+.risk-breakdown th,
+.risk-breakdown td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #eee;
+}
+
+.risk-breakdown th { color: #666; font-weight: 600; }
+.risk-breakdown td.pts { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.risk-breakdown tr.hit td { background: #fff7e0; }
+.risk-breakdown tr.hit td.pts { color: #b36b00; font-weight: 700; }
+.risk-breakdown tr.total td { font-weight: 700; border-bottom: none; }
+
+.risk-scale,
+.risk-policy {
+  font-size: 0.85rem;
+  color: #555;
+  margin: 4px 0;
+  text-align: left;
+}

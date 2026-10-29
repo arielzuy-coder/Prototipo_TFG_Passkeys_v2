@@ -22,13 +22,27 @@ class RiskEngine:
             'velocity': 0.10
         }
         
-        # Horario laboral: 8:00 AM a 7:00 PM (Buenos Aires)
-        self.business_hours_start = time(8, 0)
-        self.business_hours_end = time(19, 0)
+        # Horario laboral (Buenos Aires), configurable: por defecto 8:00 a 19:00, lunes a viernes
+        self.business_hours_start = self._parse_hhmm(settings.BUSINESS_HOURS_START, time(8, 0))
+        self.business_hours_end = self._parse_hhmm(settings.BUSINESS_HOURS_END, time(19, 0))
+        self.weekdays_only = settings.BUSINESS_WEEKDAYS_ONLY
         
         # Zona horaria de Buenos Aires
         self.timezone = pytz.timezone('America/Argentina/Buenos_Aires')
     
+    @staticmethod
+    def _parse_hhmm(value: str, default: time) -> time:
+        try:
+            hh, mm = str(value).strip().split(":")
+            return time(int(hh), int(mm))
+        except (ValueError, TypeError):
+            logger.warning("[RISK ENGINE] Horario inválido %r, se usa %s", value, default)
+            return default
+
+    def _business_label(self) -> str:
+        days = "Lun-Vie" if self.weekdays_only else "todos los días"
+        return f"{days} {self.business_hours_start:%H:%M}-{self.business_hours_end:%H:%M}"
+
     def evaluate_risk(
         self,
         user: User,
@@ -64,6 +78,11 @@ class RiskEngine:
         # Señales booleanas que usan las políticas (condiciones new_device / unusual_location)
         context['new_device'] = not factors['device'].get('known', False)
         context['unusual_location'] = not factors['location'].get('known', False)
+
+        # Aporte de cada factor al puntaje total, para explicar la decisión al usuario y al auditor
+        for name, data in factors.items():
+            data['weight'] = self.weights[name]
+            data['points'] = round(data['score'] * self.weights[name], 2)
 
         total_score = sum(
             factors[factor]['score'] * self.weights[factor]
@@ -104,7 +123,7 @@ class RiskEngine:
         # ✅ Calcular si es horario laboral (Buenos Aires)
         is_business_hours = (
             self.business_hours_start <= current_time.time() <= self.business_hours_end
-            and current_time.weekday() < 5  # Lunes a Viernes
+            and (current_time.weekday() < 5 or not self.weekdays_only)
         )
         
         logger.info(f"[RISK ENGINE] Hora UTC: {utc_now.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -245,19 +264,19 @@ class RiskEngine:
             self.business_hours_start <= current_time <= self.business_hours_end
         )
         
-        is_weekday = context['timestamp'].weekday() < 5
+        is_weekday = context['timestamp'].weekday() < 5 or not self.weekdays_only
         
         if is_business_hours and is_weekday:
             return {
                 'score': 0,
                 'is_business_hours': True,
-                'message': "Horario laboral (Lun-Vie 8-19hs)"
+                'message': f"Horario laboral ({self._business_label()})"
             }
         elif is_weekday:
             return {
                 'score': 200,  # 200 × 0.20 = 40 pts → MEDIUM (40-74)
                 'is_business_hours': False,
-                'message': "Fuera de horario laboral"
+                'message': f"Fuera de horario laboral ({self._business_label()})"
             }
         else:
             return {

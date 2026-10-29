@@ -22,11 +22,15 @@ def new_context(browser):
     page = ctx.new_page()
     cdp = ctx.new_cdp_session(page)
     cdp.send("WebAuthn.enable")
-    cdp.send("WebAuthn.addVirtualAuthenticator", {"options": {
+    page.cdp, page.authenticator = cdp, add_authenticator(cdp)
+    return ctx, page
+
+
+def add_authenticator(cdp):
+    return cdp.send("WebAuthn.addVirtualAuthenticator", {"options": {
         "protocol": "ctap2", "transport": "internal", "hasResidentKey": True,
         "hasUserVerification": True, "isUserVerified": True, "automaticPresenceSimulation": True,
-    }})
-    return ctx, page
+    }})["authenticatorId"]
 
 
 def shot(page, name):
@@ -112,6 +116,29 @@ with sync_playwright() as p:
     bruno.get_by_role("button", name="Sesiones activas").click()
     expect(bruno.get_by_text("Esta sesión")).to_be_visible()
     shot(bruno, "04a_sesiones_activas")
+
+    print("5b. Con una sola passkey no se puede revocar; con dos, sí (diálogo propio de la app)")
+    bruno.get_by_role("button", name="Mis Passkeys").click()
+    expect(bruno.get_by_role("button", name="Revocar Passkey")).to_be_disabled()
+    expect(bruno.get_by_text("Es tu única passkey")).to_be_visible()
+    shot(bruno, "04b_unica_passkey_no_revocable")
+    # Segundo dispositivo: otro autenticador (el primero se desconecta)
+    bruno.cdp.send("WebAuthn.removeVirtualAuthenticator", {"authenticatorId": bruno.authenticator})
+    bruno.authenticator = add_authenticator(bruno.cdp)
+    bruno.goto(f"{WEB}/enroll")
+    bruno.fill("#deviceName", "Notebook Bruno")
+    bruno.click("button[type=submit]")
+    bruno.wait_for_url("**/dashboard", timeout=15000)
+    revoke = bruno.locator(".passkey-card-enhanced", has_text="Celular Bruno").get_by_role("button", name="Revocar Passkey")
+    expect(revoke).to_be_enabled(timeout=10000)
+    revoke.click()
+    dialog = bruno.get_by_role("dialog")
+    expect(dialog).to_contain_text("Celular Bruno")
+    shot(bruno, "04c_confirmar_revocacion")
+    dialog.get_by_role("button", name="Revocar").click()
+    expect(bruno.locator(".toast-success")).to_contain_text("revocada", timeout=10000)
+    expect(bruno.locator(".passkey-card-enhanced")).to_have_count(1)
+    shot(bruno, "04d_passkey_revocada")
     # Un usuario estándar no puede abrir el panel ni la API de administración
     bruno.goto(f"{WEB}/admin")
     bruno.wait_for_url("**/dashboard", timeout=10000)
@@ -131,6 +158,9 @@ with sync_playwright() as p:
     login(bruno, "bruno@empresa.com")
     expect(bruno.get_by_text("Verificación adicional requerida")).to_be_visible(timeout=15000)
     assert "otp_code" not in bruno.content()
+    expect(bruno.get_by_text("¿Por qué se pide?")).to_be_visible()
+    expect(bruno.locator(".risk-breakdown tr.total")).to_contain_text("Puntaje de riesgo")
+    expect(bruno.get_by_text("Política aplicada")).to_be_visible()
     shot(bruno, "05_stepup_metodos")
     bruno.get_by_role("button", name="Verificar con Passkey").click()
     bruno.wait_for_url("**/dashboard", timeout=15000)

@@ -342,7 +342,15 @@ def login_complete(request: Request, data: LoginCompleteRequest, db: DBSession =
             "stepup_token": token,
             "expires_at": expires_at.isoformat() + "Z",
             "verification_methods": _available_stepup_methods(),
-            "risk_assessment": {"score": adjusted_score, "level": adjusted_level, "factors": factors},
+            "risk_assessment": {
+                "score": adjusted_score,
+                "computed_score": round(score, 2),
+                "level": adjusted_level,
+                "factors": factors,
+                "thresholds": {"low": settings.RISK_THRESHOLD_LOW, "high": settings.RISK_THRESHOLD_HIGH},
+                "policy": {"name": decision["policy_name"],
+                           "description": decision.get("policy_description")},
+            },
             "user": serialize_user(user),
         }
 

@@ -155,6 +155,21 @@ de 15 minutos con refresh de 8 horas y rotación obligatoria.
 
 - `GET /me/sessions` y `DELETE /me/sessions/{id}`; pestaña "Sesiones activas" en el panel del usuario.
 
+## Mejoras de presentación (después del despliegue)
+
+- **No se puede revocar la única passkey desde la interfaz**: el botón queda deshabilitado con el aviso
+  "Es tu única passkey. Agregá otra antes de revocarla". El backend ya lo impedía (409); ahora no se llega
+  a intentarlo.
+- **Avisos y confirmaciones propios de la aplicación** (`components/Notifier.js`) en lugar de los cuadros
+  `alert`/`confirm` del navegador: revocar passkey, cerrar sesión, suspender, recuperación y eliminar política.
+- **El step-up explica la decisión**: tabla con el aporte de cada factor (dispositivo, ubicación, horario,
+  intentos fallidos, frecuencia), el puntaje total, la escala de umbrales y la política aplicada. El motor
+  de riesgo devuelve `weight` y `points` por factor; la suma de `points` es el puntaje.
+- **Horario laboral configurable** (`BUSINESS_HOURS_START`, `BUSINESS_HOURS_END`, `BUSINESS_WEEKDAYS_ONLY`).
+  Por defecto 08:00–19:00 de lunes a viernes, como antes.
+- Verificado: 59 tests y la prueba en navegador, que ahora cubre la revocación con dos passkeys, el
+  bloqueo con una sola y la tabla de factores del step-up.
+
 ## Pendiente
 
 - Tesis, no implementado: **aprobación dual** para cambios críticos del administrador.

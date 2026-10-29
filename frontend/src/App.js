@@ -10,6 +10,7 @@ import AdminPanel from './components/AdminPanel';
 import RiskMonitor from './components/RiskMonitor';
 import AuditReports from './components/AuditReports';
 import ReauthPrompt from './components/ReauthPrompt';
+import { NotifierProvider } from './components/Notifier';
 import api, { clearSession, saveSession } from './services/api';
 
 const hasRole = (user, ...roles) => !!user && roles.includes(user.role);
@@ -54,6 +55,7 @@ function App() {
   }
 
   return (
+    <NotifierProvider>
     <Router>
       <div className="App">
         {user && <ReauthPrompt />}
@@ -127,6 +129,7 @@ function App() {
         </footer>
       </div>
     </Router>
+    </NotifierProvider>
   );
 }
 
