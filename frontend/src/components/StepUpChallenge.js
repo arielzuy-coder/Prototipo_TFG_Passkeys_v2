@@ -16,9 +16,9 @@ const LEVEL_LABELS = { low: 'BAJO', medium: 'MEDIO', high: 'ALTO' };
 const fmtPts = (n) => (Number.isFinite(n) ? n.toLocaleString('es-AR', { maximumFractionDigits: 1 }) : '–');
 
 const METHOD_LABELS = {
-  passkey: '👆 Passkey (biometría / PIN)',
-  otp: '📧 Código por email',
-  supervisor: '🧑‍💼 Aprobación de supervisor'
+  passkey: 'Passkey (biometría / PIN)',
+  otp: 'Código por email',
+  supervisor: 'Aprobación de supervisor'
 };
 
 /**
@@ -56,7 +56,7 @@ function StepUpChallenge({ stepupData, onSuccess, onCancel }) {
 
   const finish = (data) => {
     clearInterval(pollRef.current);
-    setMessage({ type: 'success', text: '✅ Verificación exitosa. Accediendo al sistema...' });
+    setMessage({ type: 'success', text: 'Verificación exitosa. Accediendo al sistema...' });
     setTimeout(() => onSuccess(data.user, data.tokens), 1200);
   };
 
@@ -160,7 +160,7 @@ function StepUpChallenge({ stepupData, onSuccess, onCancel }) {
     <div className="stepup-container">
       <div className="stepup-card">
         <div className="stepup-header">
-          <h2>🔐 Verificación adicional requerida</h2>
+          <h2>Verificación adicional requerida</h2>
           <div className={`risk-badge risk-${shownLevel}`}>
             Nivel de riesgo: {LEVEL_LABELS[shownLevel] || shownLevel.toUpperCase()} ({fmtPts(shownScore)}/100)
           </div>
@@ -168,6 +168,23 @@ function StepUpChallenge({ stepupData, onSuccess, onCancel }) {
 
         <div className="stepup-info">
           <p>Tu passkey es válida, pero el contexto de este acceso requiere una verificación más.</p>
+          <div className="risk-meter" role="img"
+               aria-label={`Puntaje de riesgo ${fmtPts(shownScore)} de 100`}>
+            <div className="risk-meter-wrap">
+              <div className="risk-meter-track">
+                <div className="risk-meter-zone low" style={{ width: `${thresholds.low}%` }} />
+                <div className="risk-meter-zone medium" style={{ width: `${thresholds.high - thresholds.low}%` }} />
+                <div className="risk-meter-zone high" style={{ width: `${100 - thresholds.high}%` }} />
+              </div>
+              <div className="risk-meter-marker" style={{ left: `${Math.min(100, Math.max(0, shownScore))}%` }} />
+            </div>
+            <div className="risk-meter-scale">
+              <span style={{ left: 0 }}>0</span>
+              <span style={{ left: `${thresholds.low}%` }}>{thresholds.low}</span>
+              <span style={{ left: `${thresholds.high}%` }}>{thresholds.high}</span>
+              <span style={{ left: '100%' }}>100</span>
+            </div>
+          </div>
           {factorRows.length > 0 && (
             <div className="risk-factors">
               <h4>¿Por qué se pide? Evaluación del motor de riesgo</h4>
@@ -197,7 +214,7 @@ function StepUpChallenge({ stepupData, onSuccess, onCancel }) {
           )}
         </div>
 
-        <div className="timer-display">⏱️ Tiempo restante: <strong>{formatTime(Math.max(0, timeLeft))}</strong></div>
+        <div className="timer-display">Tiempo restante: <strong>{formatTime(Math.max(0, timeLeft))}</strong></div>
 
         {methods.length > 1 && (
           <div className="verification-method-selector">
@@ -223,7 +240,7 @@ function StepUpChallenge({ stepupData, onSuccess, onCancel }) {
             <div className="verification-input biometric-info">
               <p>Volvé a confirmar con tu passkey (huella, rostro o PIN del dispositivo).</p>
               <button type="button" className="btn-primary" onClick={handlePasskey} disabled={loading || expired}>
-                {loading ? 'Verificando...' : '👆 Verificar con Passkey'}
+                {loading ? 'Verificando...' : 'Verificar con Passkey'}
               </button>
             </div>
           )}
@@ -232,7 +249,7 @@ function StepUpChallenge({ stepupData, onSuccess, onCancel }) {
             <form onSubmit={handleVerifyOtp} className="verification-input">
               {!otpSent ? (
                 <button type="button" className="btn-primary" onClick={handleSendOtp} disabled={loading || expired}>
-                  📧 Enviar código a mi email
+                  Enviar código a mi email
                 </button>
               ) : (
                 <>
@@ -264,7 +281,7 @@ function StepUpChallenge({ stepupData, onSuccess, onCancel }) {
                 onClick={handleRequestApproval}
                 disabled={loading || waitingApproval || expired}
               >
-                {waitingApproval ? '⏳ Esperando aprobación...' : '🧑‍💼 Solicitar aprobación'}
+                {waitingApproval ? 'Esperando aprobación...' : 'Solicitar aprobación'}
               </button>
             </div>
           )}
@@ -277,7 +294,7 @@ function StepUpChallenge({ stepupData, onSuccess, onCancel }) {
         </div>
 
         <div className="stepup-footer">
-          <p className="security-note">🔒 Esta verificación protege tu cuenta contra accesos no autorizados.</p>
+          <p className="security-note">Esta verificación protege tu cuenta contra accesos no autorizados.</p>
         </div>
       </div>
     </div>

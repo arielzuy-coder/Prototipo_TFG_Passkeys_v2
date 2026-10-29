@@ -139,7 +139,7 @@ const AuditReports = () => {
   
   return (
     <div className="audit-reports-container">
-      <h2>📊 Auditoría y Reportes</h2>
+      <h2>Auditoría y Reportes</h2>
       
       {/* Estadísticas Rápidas */}
       {stats && (
@@ -172,7 +172,7 @@ const AuditReports = () => {
       
       {/* Filtros Avanzados */}
       <div className="filters-section">
-        <h3>🔍 Filtros Avanzados</h3>
+        <h3>Filtros Avanzados</h3>
         <div className="filters-grid">
           <div className="filter-group">
             <label>Fecha Inicio:</label>
@@ -231,7 +231,7 @@ const AuditReports = () => {
           disabled={loading}
           className="btn-primary"
         >
-          {loading ? '⏳ Generando...' : '📈 Generar Reporte Agregado'}
+          {loading ? 'Generando...' : 'Generar Reporte Agregado'}
         </button>
         
         <button 
@@ -239,7 +239,7 @@ const AuditReports = () => {
           disabled={loading}
           className="btn-export"
         >
-          📄 Exportar CSV
+          Exportar CSV
         </button>
         
         <button 
@@ -247,21 +247,21 @@ const AuditReports = () => {
           disabled={loading}
           className="btn-export"
         >
-          📋 Exportar JSON
+          Exportar JSON
         </button>
       </div>
       
       {/* Error */}
       {error && (
         <div className="error-message">
-          ❌ {error}
+          {error}
         </div>
       )}
       
       {/* Reporte Agregado */}
       {reportData && (
         <div className="report-section">
-          <h3>📊 Reporte Agregado</h3>
+          <h3>Reporte Agregado</h3>
           
           <div className="report-period">
             <strong>Período:</strong> {reportData.period}

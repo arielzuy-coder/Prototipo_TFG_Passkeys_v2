@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, NavLink } from 'react-router-dom';
 import './App.css';
 import './styles/Dashboard_styles.css';
 import './styles/RiskMonitor_styles.css';
@@ -12,6 +12,8 @@ import AuditReports from './components/AuditReports';
 import ReauthPrompt from './components/ReauthPrompt';
 import { NotifierProvider } from './components/Notifier';
 import api, { clearSession, saveSession } from './services/api';
+
+const ROLE_LABELS = { admin: 'Administrador', auditor: 'Auditor', user: 'Usuario' };
 
 const hasRole = (user, ...roles) => !!user && roles.includes(user.role);
 
@@ -60,8 +62,39 @@ function App() {
       <div className="App">
         {user && <ReauthPrompt />}
         <header className="app-header">
-          <h1>🔐 Prototipo Autenticación Passkeys + Zero Trust</h1>
-          <p className="subtitle">TFG - Universidad Siglo 21 | Zuy, Ariel Hernán</p>
+          <div className="topbar">
+            <NavLink to={user ? '/dashboard' : '/login'} className="brand" aria-label="Inicio">
+              <svg className="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+                <path d="M16 2.5 4.5 7v8.2c0 7 4.9 12.6 11.5 14.3 6.6-1.7 11.5-7.3 11.5-14.3V7L16 2.5Z" fill="currentColor" opacity=".16"/>
+                <path d="M16 2.5 4.5 7v8.2c0 7 4.9 12.6 11.5 14.3 6.6-1.7 11.5-7.3 11.5-14.3V7L16 2.5Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/>
+                <circle cx="16" cy="13.5" r="3.4" fill="none" stroke="currentColor" strokeWidth="1.8"/>
+                <path d="M16 16.9v6.1M16 20.3h2.6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+              </svg>
+              <span className="brand-text">
+                <span className="brand-name">Acceso corporativo</span>
+                <span className="brand-sub">Passkeys y Zero Trust</span>
+              </span>
+            </NavLink>
+
+            {user && (
+              <nav className="topnav" aria-label="Secciones">
+                <NavLink to="/dashboard">Mi cuenta</NavLink>
+                {hasRole(user, 'admin') && <NavLink to="/admin">Panel Admin</NavLink>}
+                {hasRole(user, 'admin', 'auditor') && <NavLink to="/risk">Riesgo</NavLink>}
+                {hasRole(user, 'admin', 'auditor') && <NavLink to="/audit">Auditoría</NavLink>}
+              </nav>
+            )}
+
+            {user && (
+              <div className="topbar-user">
+                <span className="topbar-who">
+                  <span className="topbar-name">{user.display_name || user.email}</span>
+                  <span className={`role-chip role-${user.role}`}>{ROLE_LABELS[user.role] || user.role}</span>
+                </span>
+                <button type="button" className="topbar-logout" onClick={handleLogout}>Cerrar sesión</button>
+              </div>
+            )}
+          </div>
         </header>
 
         <main className="app-main">
@@ -84,7 +117,7 @@ function App() {
               path="/dashboard" 
               element={
                 user ? 
-                  <Dashboard user={user} onLogout={handleLogout} /> : 
+                  <Dashboard user={user} /> : 
                   <Navigate to="/login" replace />
               } 
             />
@@ -124,8 +157,8 @@ function App() {
         </main>
 
         <footer className="app-footer">
-          <p>© 2025 Zuy, Ariel Hernán | Legajo: VLSI002384</p>
-          <p>Licenciatura en Seguridad Informática | Universidad Siglo 21</p>
+          <p>Trabajo Final de Grado, Licenciatura en Seguridad Informática, Universidad Siglo 21</p>
+          <p>Ariel Hernán Zuy, legajo VLSI002384</p>
         </footer>
       </div>
     </Router>

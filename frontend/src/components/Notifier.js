@@ -15,7 +15,7 @@ const NotifierContext = createContext({
 
 export const useNotifier = () => useContext(NotifierContext);
 
-const ICONS = { success: '✅', error: '⚠️', info: 'ℹ️' };
+const ICONS = { success: '', error: '', info: '' };
 
 export function NotifierProvider({ children }) {
   const [toasts, setToasts] = useState([]);

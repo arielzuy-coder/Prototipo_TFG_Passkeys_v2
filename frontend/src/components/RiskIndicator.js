@@ -21,13 +21,13 @@ function RiskIndicator({ assessment }) {
   const getRiskIcon = (level) => {
     switch (level) {
       case 'low':
-        return '✅';
+        return '';
       case 'medium':
-        return '⚠️';
+        return '';
       case 'high':
-        return '🚨';
+        return '';
       default:
-        return 'ℹ️';
+        return '';
     }
   };
 

@@ -1,0 +1,654 @@
+/* =====================================================================
+   Tema "Acceso corporativo"
+   Consola de identidad sobria: tinta azul, superficies planas con borde,
+   un solo color de acción (petróleo) y colores de riesgo con significado.
+   Se carga al final (index.js) y reemplaza el estilo anterior.
+   ===================================================================== */
+
+:root {
+  --ink: #102a43;          /* barra superior, títulos */
+  --ink-2: #243b53;        /* texto principal */
+  --muted: #5f7186;        /* texto secundario */
+  --line: #d9e2ec;         /* bordes */
+  --line-soft: #e9eef4;
+  --paper: #f3f6f9;        /* fondo de página */
+  --surface: #ffffff;
+  --accent: #0b6e79;       /* acción principal / verificado */
+  --accent-hover: #095b64;
+  --accent-soft: #e3f2f3;
+  --low: #2f7a4f;    --low-soft: #e4f3ea;
+  --medium: #a8650d; --medium-soft: #fdf1df;
+  --high: #b42318;   --high-soft: #fde8e6;
+  --focus: 0 0 0 3px rgba(11, 110, 121, 0.28);
+  --radius: 8px;
+  --radius-sm: 6px;
+  --font: 'IBM Plex Sans', 'Segoe UI', Roboto, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+}
+
+/* ---------- Base ---------- */
+body {
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.5;
+  background: var(--paper);
+  color: var(--ink-2);
+  font-feature-settings: "tnum" 1;
+}
+
+.App { background: var(--paper); }
+
+h1, h2, h3, h4 { font-family: var(--font); color: var(--ink); letter-spacing: -0.005em; }
+h1 { font-size: 1.95rem; font-weight: 600; line-height: 1.2; }
+h2 { font-size: 1.55rem; font-weight: 600; line-height: 1.25; }
+h3 { font-size: 1.2rem; font-weight: 600; line-height: 1.3; }
+h4 { font-size: 1rem; font-weight: 600; line-height: 1.35; }
+
+a { color: var(--accent); }
+
+:focus-visible { outline: none; box-shadow: var(--focus); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* Sin entradas animadas ni "saltos" al pasar el mouse */
+.policies-content, .admin-card, .audit-reports-container, .risk-monitor-container { animation: none; }
+.stat-card:hover, .passkey-card-enhanced:hover, .btn-revoke:hover, .feature-card:hover,
+.btn-primary:hover, .btn-secondary:hover, .btn-admin:hover, .btn-logout:hover,
+.method-btn:hover, .tab:hover, .bar:hover { transform: none; }
+
+/* ---------- Barra superior ---------- */
+.app-header {
+  background: var(--ink);
+  padding: 0;
+  text-align: left;
+  box-shadow: none;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.topbar {
+  max-width: 1160px;
+  margin: 0 auto;
+  height: 60px;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #fff;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.brand-mark { width: 28px; height: 28px; color: #7fd1d8; }
+.brand-text { display: flex; flex-direction: column; line-height: 1.15; }
+.brand-name { font-weight: 600; font-size: 0.98rem; color: #fff; }
+.brand-sub { font-size: 0.75rem; color: #9fb3c8; }
+
+.topnav { display: flex; gap: 4px; flex: 1; }
+.topnav a {
+  color: #bcccdc;
+  text-decoration: none;
+  font-size: 0.92rem;
+  font-weight: 500;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+}
+.topnav a:hover { color: #fff; background: rgba(255, 255, 255, 0.07); }
+.topnav a.active { color: #fff; background: rgba(127, 209, 216, 0.16); box-shadow: inset 0 -2px 0 #7fd1d8; }
+
+.topbar-user { display: flex; align-items: center; gap: 14px; margin-left: auto; }
+.topbar-who { display: flex; align-items: center; gap: 8px; }
+.topbar-name { color: #fff; font-size: 0.9rem; font-weight: 500; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.role-chip {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #d9e2ec;
+}
+.role-chip.role-admin { background: rgba(127, 209, 216, 0.2); color: #b9eef2; }
+.role-chip.role-auditor { background: rgba(240, 180, 41, 0.18); color: #f7d58b; }
+
+.topbar-logout {
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: #d9e2ec;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.topbar-logout:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+
+@media (max-width: 860px) {
+  .topbar { height: auto; flex-wrap: wrap; gap: 10px 16px; padding: 10px 16px; }
+  .topnav { order: 3; flex-basis: 100%; overflow-x: auto; }
+  .brand-sub, .topbar-name { display: none; }
+}
+
+/* ---------- Contenido ---------- */
+.app-main {
+  display: block;
+  width: 100%;
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 32px 20px 48px;
+}
+
+.app-footer {
+  background: transparent;
+  border-top: 1px solid var(--line);
+  padding: 18px 20px 26px;
+  text-align: center;
+  box-shadow: none;
+}
+.app-footer p { color: var(--muted); font-size: 0.8rem; margin: 2px 0; }
+
+/* Contenedores de página: sin tarjeta blanca gigante, el contenido apoya en el fondo */
+.dashboard-container, .admin-container, .admin-card, .audit-reports-container,
+.risk-monitor-container, .admin-panel {
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  max-width: none;
+  border-radius: 0;
+}
+
+.dashboard-header, .admin-header, .risk-monitor-header {
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  padding: 0 0 18px;
+  margin: 0 0 24px;
+  text-align: left;
+}
+.dashboard-header h2, .admin-header h2, .admin-header h1,
+.audit-reports-container > h2, .audit-reports-container h1 {
+  color: var(--ink);
+  font-size: 1.55rem;
+  margin: 0 0 4px;
+}
+.user-email, .subtitle, .section-subtitle, .auth-subtitle, .au-hint {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.section-header { margin-bottom: 18px; text-align: left; }
+.section-header h3 { color: var(--ink); margin-bottom: 2px; }
+
+/* Superficies */
+.dashboard-content, .filters-section, .report-section, .stats-summary,
+.risk-card, .au-card, .stepup-card, .auth-card, .reauth-dialog,
+.risk-main-panel, .risk-factors-panel, .risk-history-panel, .policies-table-container,
+.stats-section, .events-breakdown {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: none;
+}
+.dashboard-content { padding: 24px; }
+.filters-section, .report-section, .stats-summary { padding: 22px 24px; margin-bottom: 20px; }
+.reauth-dialog { box-shadow: 0 24px 60px rgba(16, 42, 67, 0.28); }
+
+/* ---------- Formularios ---------- */
+label, .form-group label { color: var(--ink-2); font-weight: 500; font-size: 0.9rem; }
+
+input[type=text], input[type=email], input[type=number], input[type=datetime-local],
+input:not([type]), select, textarea {
+  font-family: var(--font);
+  font-size: 0.95rem;
+  color: var(--ink-2);
+  background: var(--surface);
+  border: 1px solid #bccbd9;
+  border-radius: var(--radius-sm);
+  padding: 9px 11px;
+  box-shadow: none;
+}
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: var(--focus); }
+input:disabled, input[readonly], select:disabled { background: #f5f7fa; color: var(--muted); }
+
+/* ---------- Botones ---------- */
+.btn-primary, .btn-secondary, .btn-danger, .btn-admin, .btn-logout, .btn-revoke,
+.btn-export, .btn-refresh, .back-button, .method-btn, .btn-save-small, .btn-cancel-small,
+.btn-edit, .btn-delete, .btn-large {
+  font-family: var(--font);
+  font-size: 0.92rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  padding: 9px 16px;
+  box-shadow: none;
+  background-image: none;
+  cursor: pointer;
+  transition: background-color 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.btn-primary, .btn-export:first-child {
+  background: var(--accent);
+  color: #fff;
+  border: 1px solid var(--accent);
+}
+.btn-primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); box-shadow: none; }
+
+.btn-secondary, .btn-export, .btn-refresh, .back-button, .btn-admin, .btn-cancel-small, .btn-edit {
+  background: var(--surface);
+  color: var(--ink-2);
+  border: 1px solid #bccbd9;
+}
+.btn-secondary:hover:not(:disabled), .btn-export:hover, .btn-refresh:hover, .back-button:hover,
+.btn-admin:hover, .btn-cancel-small:hover, .btn-edit:hover {
+  background: #f0f4f8;
+  border-color: #9fb3c8;
+  color: var(--ink);
+  box-shadow: none;
+}
+
+.btn-danger, .btn-revoke, .btn-logout, .btn-delete {
+  background: var(--surface);
+  color: var(--high);
+  border: 1px solid #e8b4ae;
+}
+.btn-danger:hover:not(:disabled), .btn-revoke:hover:not(:disabled), .btn-logout:hover, .btn-delete:hover {
+  background: var(--high);
+  border-color: var(--high);
+  color: #fff;
+}
+
+.btn-save-small { background: var(--accent); color: #fff; border: 1px solid var(--accent); }
+
+button:disabled, .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn-revoke:disabled, .btn-revoke:disabled:hover {
+  background: #f3f5f8; color: #8a9bb0; border-color: var(--line); opacity: 1;
+}
+
+.link-button { color: var(--accent); font-family: var(--font); font-weight: 500; }
+
+/* ---------- Pestañas ---------- */
+.dashboard-tabs, .admin-tabs {
+  display: flex;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  padding: 0;
+  margin: 0 0 22px;
+  box-shadow: none;
+  border-radius: 0;
+}
+.dashboard-tabs .tab, .admin-tabs .tab-button {
+  flex: 0 0 auto;
+  font-family: var(--font);
+  font-size: 0.93rem;
+  font-weight: 500;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 10px 14px;
+  margin-bottom: -1px;
+  box-shadow: none;
+}
+.dashboard-tabs .tab:hover, .admin-tabs .tab-button:hover { color: var(--ink); background: transparent; }
+.dashboard-tabs .tab.active, .admin-tabs .tab-button.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  background: transparent;
+  box-shadow: none;
+  font-weight: 600;
+}
+.admin-tabs .tab-button .icon, .header-title .icon, .empty-icon,
+.stat-icon, .stat-icon-big, .date-icon, .passkey-icon-large, .feature-icon, .risk-detail-icon,
+.risk-stat-icon, .risk-icon { display: none; }
+
+.dashboard-content { border-radius: var(--radius); }
+.dashboard-tabs + .dashboard-content { margin-top: 0; }
+
+/* ---------- Mensajes ---------- */
+.message {
+  border-radius: var(--radius-sm);
+  border: 1px solid;
+  border-left-width: 4px;
+  padding: 10px 14px;
+  font-size: 0.92rem;
+}
+.message.success { background: var(--low-soft); border-color: #a9d7bb; border-left-color: var(--low); color: #1f5236; }
+.message.error { background: var(--high-soft); border-color: #f1b8b2; border-left-color: var(--high); color: #7a1a12; }
+.message.info { background: var(--accent-soft); border-color: #a9d3d7; border-left-color: var(--accent); color: #0a4a52; }
+.message.warning { background: var(--medium-soft); border-color: #f0cf9c; border-left-color: var(--medium); color: #6b4108; }
+
+.info-box {
+  background: #f6f9fb;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--ink-2);
+}
+.info-box h4, .info-box strong { color: var(--ink); }
+
+/* ---------- Login y enrolamiento ---------- */
+.auth-container { max-width: 440px; margin: 24px auto 0; }
+.auth-card { padding: 32px; }
+.auth-card h2 { font-size: 1.5rem; color: var(--ink); }
+.auth-form .btn-primary { width: 100%; padding: 11px 16px; font-size: 0.98rem; }
+.auth-links { border-top: 1px solid var(--line-soft); }
+
+/* ---------- Mi cuenta ---------- */
+.risk-summary { gap: 16px; margin-bottom: 22px; }
+.risk-card { padding: 18px 20px; text-align: left; }
+.risk-card h4 { color: var(--muted); font-weight: 500; font-size: 0.88rem; margin-bottom: 8px; }
+.risk-card .risk-score { justify-content: flex-start; }
+.risk-number { color: var(--ink); font-weight: 600; }
+
+.passkeys-stats {
+  background: transparent;
+  border: none;
+  padding: 0;
+  gap: 0;
+  margin-bottom: 20px;
+  display: flex;
+  border-top: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+}
+.passkeys-stats .stat-item { flex: 1; padding: 14px 0; gap: 0; }
+.passkeys-stats .stat-item + .stat-item { border-left: 1px solid var(--line-soft); padding-left: 20px; }
+.passkeys-stats .stat-number { color: var(--ink); font-size: 1.6rem; font-weight: 600; }
+.passkeys-stats .stat-label { color: var(--muted); font-size: 0.85rem; text-transform: none; letter-spacing: 0; }
+
+.passkeys-grid { gap: 16px; }
+.passkey-card-enhanced {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--accent);
+  border-radius: var(--radius);
+  box-shadow: none;
+  overflow: hidden;
+}
+.passkey-card-header {
+  background: transparent;
+  padding: 14px 20px 0;
+  min-height: 0;
+  justify-content: flex-end;
+}
+.passkey-status .status-badge, .status-badge.active {
+  background: var(--low-soft);
+  color: var(--low);
+  border: none;
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+.passkey-card-body { padding: 4px 20px 16px; }
+.passkey-name { color: var(--ink); font-size: 1.1rem; }
+.type-badge { background: #eef2f6; color: var(--ink-2); font-weight: 500; }
+.passkey-dates { border-top: 1px solid var(--line-soft); }
+.date-label { color: var(--muted); }
+.date-value, .date-value strong { color: var(--ink-2); }
+.passkey-card-footer { background: #f8fafc; border-top: 1px solid var(--line-soft); padding: 12px 20px; }
+.revoke-hint { color: var(--muted); }
+.passkeys-actions { text-align: left; }
+
+/* Tablas */
+.audit-table, .policies-table, .data-table, .risk-breakdown {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  background: var(--surface);
+}
+.audit-table th, .policies-table th, .data-table th {
+  background: #f3f6f9;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.82rem;
+  text-transform: none;
+  letter-spacing: 0;
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.audit-table td, .policies-table td, .data-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--ink-2);
+}
+.audit-table tr:hover td, .policies-table tr:hover td, .data-table tr:hover td { background: #fafcfd; }
+.ip-cell, .au-card-header small, .au-ua, .details-cell pre, .risk-history-location { font-family: var(--mono); font-size: 0.82rem; }
+.details-cell pre { background: #f6f9fb; border: 1px solid var(--line-soft); border-radius: var(--radius-sm); }
+
+.event-badge {
+  background: #eef2f6;
+  color: var(--ink-2);
+  border-radius: 999px;
+  font-weight: 500;
+  font-size: 0.82rem;
+  padding: 3px 10px;
+}
+.event-badge.auth_success, .event-badge.stepup_success, .event-badge.reauth_success, .event-badge.passkey_enrolled {
+  background: var(--low-soft); color: var(--low);
+}
+.event-badge.auth_failed, .event-badge.stepup_failed, .event-badge.access_denied, .event-badge.session_revoked, .event-badge.passkey_revoked {
+  background: var(--high-soft); color: var(--high);
+}
+.event-badge.stepup_requested, .event-badge.stepup_approval_requested { background: var(--medium-soft); color: var(--medium); }
+
+/* Estadísticas genéricas */
+.stats-grid { gap: 14px; }
+.stat-card,
+.stats-summary .stat-card,
+.stats-summary .stat-card.success-rate,
+.policies-stats .stat-card {
+  background: var(--surface);
+  color: var(--ink-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: none;
+  padding: 16px 18px;
+  text-align: left;
+  display: block;
+}
+.stats-summary .stat-card.success-rate { border-left: 4px solid var(--low); }
+.stat-value, .stats-summary .stat-value, .stat-big-number, .policies-stats .stat-number, .metric-value, .risk-stat-number {
+  color: var(--ink);
+  font-size: 1.85rem;
+  font-weight: 600;
+  line-height: 1.15;
+  opacity: 1;
+}
+.stat-label, .stats-summary .stat-label, .stat-big-label, .policies-stats .stat-label, .metric-label, .risk-stat-label {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: 1;
+}
+.stat-card .stat-info { text-align: left; }
+.risk-stat-card { background: var(--surface); border: 1px solid var(--line); box-shadow: none; border-radius: var(--radius); }
+
+/* ---------- Riesgo: colores con significado ---------- */
+.risk-badge {
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+  padding: 3px 10px;
+  background: #eef2f6;
+  color: var(--ink-2);
+}
+.risk-badge.low, .risk-badge.risk-low, .risk-level-badge.low { background: var(--low-soft); color: var(--low); }
+.risk-badge.medium, .risk-badge.risk-medium, .risk-level-badge.medium { background: var(--medium-soft); color: var(--medium); }
+.risk-badge.high, .risk-badge.risk-high, .risk-level-badge.high { background: var(--high-soft); color: var(--high); }
+
+/* ---------- Step-up ---------- */
+.stepup-container { max-width: 640px; margin: 8px auto 0; }
+.stepup-card { padding: 28px; border-top: 3px solid var(--medium); }
+.stepup-header h2 { font-size: 1.4rem; color: var(--ink); }
+.stepup-info, .stepup-info p { color: var(--ink-2); background: transparent; }
+.risk-factors { background: transparent; border: none; padding: 0; }
+.risk-factors h4 { color: var(--ink); font-size: 0.95rem; margin: 14px 0 6px; }
+.risk-breakdown th { color: var(--muted); font-size: 0.8rem; font-weight: 600; background: transparent; }
+.risk-breakdown td { color: var(--ink-2); }
+.risk-breakdown tr.hit td { background: var(--medium-soft); }
+.risk-breakdown tr.hit td.pts { color: var(--medium); }
+.risk-breakdown tr.total td { color: var(--ink); border-top: 1px solid var(--line); }
+.risk-scale, .risk-policy, .security-note { color: var(--muted); }
+.timer-display { background: #f6f9fb; border: 1px solid var(--line-soft); color: var(--ink-2); border-radius: var(--radius-sm); }
+.method-buttons { gap: 8px; }
+.method-btn {
+  background: var(--surface);
+  color: var(--ink-2);
+  border: 1px solid #bccbd9;
+}
+.method-btn.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.stepup-footer { border-top: 1px solid var(--line-soft); }
+
+/* Medidor de riesgo (step-up) */
+.risk-meter { margin: 6px 0 4px; }
+.risk-meter-track {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  display: flex;
+}
+.risk-meter-zone.low { background: #bfe3cc; }
+.risk-meter-zone.medium { background: #f3d39b; }
+.risk-meter-zone.high { background: #f1aaa2; }
+.risk-meter-marker {
+  position: absolute;
+  top: 1px;
+  width: 4px;
+  height: 20px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: var(--ink);
+  box-shadow: 0 0 0 2px #fff;
+}
+.risk-meter-scale { position: relative; height: 18px; font-size: 0.75rem; color: var(--muted); }
+.risk-meter-scale span { position: absolute; transform: translateX(-50%); top: 3px; }
+.risk-meter-scale span:first-child { transform: none; }
+.risk-meter-scale span:last-child { transform: translateX(-100%); }
+.risk-meter-wrap { position: relative; padding-top: 6px; }
+
+/* ---------- Administración ---------- */
+.au-section { border-top: 1px solid var(--line-soft); padding-top: 18px; margin-top: 22px; }
+.au-section:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+.au-section h3 { color: var(--ink); }
+.au-card { padding: 14px 16px; }
+.au-card.au-pending { border-left: 4px solid var(--medium); background: #fffdf8; }
+.au-card-header h4 { color: var(--ink); }
+.au-badge { font-weight: 600; font-size: 0.75rem; border-radius: 999px; }
+.au-badge.active { background: var(--low-soft); color: var(--low); }
+.au-badge.pending { background: var(--medium-soft); color: var(--medium); }
+.au-badge.suspended { background: var(--high-soft); color: var(--high); }
+.au-meta, .au-ua { color: var(--muted); }
+.policies-header { border-bottom: none; }
+.policy-form { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: none; }
+
+/* ---------- Auditoría ---------- */
+.event-types-grid .checkbox-label, .checkbox-label { color: var(--ink-2); font-weight: 400; }
+.report-period { background: #f6f9fb; border: 1px solid var(--line-soft); color: var(--ink-2); border-radius: var(--radius-sm); }
+.metric-item, .breakdown-item, .event-stat {
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  box-shadow: none;
+}
+.metric-item .metric-label, .breakdown-type, .event-type { color: var(--ink-2); font-size: 0.9rem; text-transform: none; }
+.metric-item .metric-value, .breakdown-count, .event-count { color: var(--ink); font-size: 1.05rem; font-weight: 600; }
+.top-ips table th, .top-ips th { background: #f3f6f9; color: var(--muted); }
+.top-ips td:first-child { font-family: var(--mono); font-size: 0.85rem; }
+.hourly-distribution .chart-container { background: #f8fafc; border: 1px solid var(--line-soft); }
+.hourly-distribution .bar, .bar { background: var(--accent); border-radius: 3px 3px 0 0; }
+.hourly-distribution .bar.empty { background: var(--line); }
+.hourly-distribution .bar-count { color: var(--accent); }
+
+/* ---------- Avisos ---------- */
+.toast { border: 1px solid var(--line); border-left: 4px solid var(--accent); box-shadow: 0 12px 32px rgba(16, 42, 67, 0.16); font-family: var(--font); }
+.toast-success { border-left-color: var(--low); }
+.toast-error { border-left-color: var(--high); }
+.toast-icon:empty { display: none; }
+
+/* ---------- Carga ---------- */
+.spinner { border-color: var(--line); border-top-color: var(--accent); }
+.loading-container p { color: var(--muted); }
+
+/* ---------- Ajustes tras revisar capturas ---------- */
+.dashboard-tabs .tab, .admin-tabs .tab-button { transition: color 0.12s, border-color 0.12s; transform: none; }
+.admin-tabs { gap: 4px; padding: 0; margin-bottom: 24px; background: transparent; border-bottom: 1px solid var(--line); }
+.admin-tabs .tab-button { font-size: 0.93rem; font-weight: 500; padding: 10px 14px; border: none; border-bottom: 2px solid transparent; box-shadow: none; }
+.admin-tabs .tab-button.active { font-weight: 600; border-bottom-color: var(--accent); }
+.admin-tabs .tab-button span { font-size: inherit; }
+
+.stepup-container { background: transparent; border: none; padding: 0; }
+.stepup-header { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-bottom: 10px; }
+.stepup-header .risk-badge { display: inline-block; width: auto; }
+.stepup-form p, .verification-input p, .biometric-info p { color: var(--ink-2); }
+.security-note { color: var(--muted); font-size: 0.85rem; }
+.timer-display { padding: 8px 12px; display: inline-block; }
+
+.auth-form { gap: 1.1rem; }
+.au-card-header small { font-family: var(--font); font-size: 0.85rem; color: var(--muted); }
+.au-section .policy-form { border: none; padding: 0; background: transparent; }
+.passkey-card-header { padding-top: 12px; }
+.dashboard-tabs .tab, .admin-tabs .tab-button { transition: none; }
+.stepup-actions { margin: 0; padding: 0; }
+.stepup-actions button { margin: 0; }
+.stepup-footer, .stepup-footer p, .stepup-footer .security-note { color: var(--muted); background: transparent; }
+
+/* Monitor de riesgo */
+.risk-level-badge { background: transparent; padding: 0; border-radius: 0; text-align: center; }
+.risk-badge-large { box-shadow: none; background-image: none; font-size: 1rem; padding: 6px 18px; letter-spacing: 0.04em; border-radius: 999px; }
+.risk-badge-large.low { background: var(--low-soft); color: var(--low); }
+.risk-badge-large.medium { background: var(--medium-soft); color: var(--medium); }
+.risk-badge-large.high { background: var(--high-soft); color: var(--high); }
+.risk-monitor-header h3, .risk-history-panel h3, .risk-factors-panel h3, .risk-main-panel h3,
+.risk-monitor-container h2, .risk-monitor-container h3, .risk-monitor-container h4 { color: var(--ink); }
+.risk-main-panel, .risk-history-panel, .risk-factors-panel { padding: 24px; }
+.risk-detail-item { background: #f6f9fb; border: 1px solid var(--line-soft); box-shadow: none; border-radius: var(--radius-sm); }
+.risk-detail-label { color: var(--muted); }
+.risk-detail-value { color: var(--ink); }
+.risk-monitor-header { display: flex; align-items: center; justify-content: space-between; }
+.risk-monitor-header h3 { font-size: 1.55rem; margin: 0; }
+
+/* Políticas */
+.policies-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.policies-header .header-title h2, .policies-header .header-title h3 { margin: 0; }
+.policies-stats .stat-card { display: flex; flex-direction: column; gap: 2px; }
+.policies-stats .stat-number { display: block; }
+.btn-icon { font-size: 0.82rem; padding: 5px 10px; }
+.policies-table td:last-child { white-space: nowrap; }
+.btn-icon + .btn-icon { margin-left: 6px; }
+.btn-icon-edit { font-size: 0.78rem; font-weight: 500; color: var(--accent); background: transparent; border: none; cursor: pointer; padding: 2px 6px; }
+
+/* Mi cuenta: tarjetas de riesgo alineadas a la izquierda */
+.risk-card, .risk-card .risk-score { align-items: flex-start; text-align: left; }
+.risk-card .risk-score { display: flex; flex-direction: column; gap: 6px; }
+
+/* Móvil */
+@media (max-width: 860px) {
+  .topnav a { white-space: nowrap; }
+  .dashboard-header, .admin-header { padding-left: 0; padding-right: 0; }
+  .dashboard-tabs, .admin-tabs { flex-direction: row; overflow-x: auto; flex-wrap: nowrap; }
+  .dashboard-tabs .tab, .admin-tabs .tab-button { white-space: nowrap; }
+  .dashboard-content { padding: 16px; }
+  .passkeys-stats { flex-wrap: wrap; }
+}
+@media (max-width: 768px) {
+  .dashboard-header { align-items: flex-start; text-align: left; }
+}

@@ -39,11 +39,11 @@ function EnrollPasskey({ user }) {
     try {
       if (mode === 'invite') {
         await enrollWithInvitation(inviteToken, deviceName.trim());
-        setMessage({ type: 'success', text: '✅ Passkey enrolada. Redirigiendo al inicio de sesión...' });
+        setMessage({ type: 'success', text: 'Passkey enrolada. Redirigiendo al inicio de sesión...' });
         setTimeout(() => navigate('/login', { replace: true }), 2000);
       } else {
         await addPasskey(deviceName.trim());
-        setMessage({ type: 'success', text: '✅ Passkey agregada. Volviendo al panel...' });
+        setMessage({ type: 'success', text: 'Passkey agregada. Volviendo al panel...' });
         setTimeout(() => navigate('/dashboard', { replace: true }), 1500);
       }
     } catch (error) {
@@ -57,7 +57,7 @@ function EnrollPasskey({ user }) {
     return (
       <div className="auth-container">
         <div className="auth-card">
-          <h2>📱 Enrolar Passkey</h2>
+          <h2>Enrolar Passkey</h2>
           <div className="message warning">
             Para enrolar tu primera passkey necesitás el link de invitación que te envía el administrador.
             Si perdiste tu dispositivo, pedí una recuperación de cuenta.
@@ -70,8 +70,8 @@ function EnrollPasskey({ user }) {
     );
   }
 
-  const title = mode === 'add' ? '📱 Agregar otra Passkey'
-    : invitation?.purpose === 'recovery' ? '🔄 Recuperar acceso' : '📱 Enrolar tu Passkey';
+  const title = mode === 'add' ? 'Agregar otra Passkey'
+    : invitation?.purpose === 'recovery' ? 'Recuperar acceso' : 'Enrolar tu Passkey';
   const formDisabled = loading || checking || (mode === 'invite' && !invitation);
 
   return (
@@ -88,7 +88,7 @@ function EnrollPasskey({ user }) {
 
         <form onSubmit={handleEnroll} className="auth-form">
           <div className="form-group">
-            <label htmlFor="email">📧 Cuenta</label>
+            <label htmlFor="email">Cuenta</label>
             <input
               type="email"
               id="email"
@@ -99,7 +99,7 @@ function EnrollPasskey({ user }) {
           </div>
 
           <div className="form-group">
-            <label htmlFor="deviceName">💻 Nombre del dispositivo</label>
+            <label htmlFor="deviceName">Nombre del dispositivo</label>
             <input
               type="text"
               id="deviceName"
@@ -115,7 +115,7 @@ function EnrollPasskey({ user }) {
           {message.text && <div className={`message ${message.type}`}>{message.text}</div>}
 
           <button type="submit" className="btn-primary" disabled={formDisabled}>
-            {loading ? (<><span className="spinner-small"></span> Enrolando...</>) : '🔑 Enrolar Passkey'}
+            {loading ? (<><span className="spinner-small"></span> Enrolando...</>) : 'Enrolar Passkey'}
           </button>
         </form>
 
@@ -130,15 +130,15 @@ function EnrollPasskey({ user }) {
         </div>
 
         <div className="info-box">
-          <h4>ℹ️ ¿Qué es una Passkey?</h4>
+          <h4>¿Qué es una Passkey?</h4>
           <p>
             Una credencial criptográfica que reemplaza a la contraseña. La clave privada nunca sale de tu
             dispositivo y se desbloquea con tu huella, rostro o PIN.
           </p>
           <ul>
-            <li>✅ Sin contraseñas que recordar</li>
-            <li>✅ Resistente a phishing: solo funciona en este sitio</li>
-            <li>✅ Estándar FIDO2/WebAuthn</li>
+            <li>Sin contraseñas que recordar</li>
+            <li>Resistente a phishing: solo funciona en este sitio</li>
+            <li>Estándar FIDO2/WebAuthn</li>
           </ul>
         </div>
       </div>

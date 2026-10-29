@@ -4,7 +4,7 @@ import api, { errorMessage } from '../services/api';
 import { useNotifier } from './Notifier';
 import '../styles/Security_v2.css';
 
-function Dashboard({ user, onLogout }) {
+function Dashboard({ user }) {
   const navigate = useNavigate();
   const { notify, confirm } = useNotifier();
   const [passkeys, setPasskeys] = useState([]);
@@ -17,7 +17,6 @@ function Dashboard({ user, onLogout }) {
   const [editingPasskey, setEditingPasskey] = useState(null);
   const [newName, setNewName] = useState('');
   const canAudit = ['admin', 'auditor'].includes(user.role);
-  const isAdmin = user.role === 'admin';
 
   useEffect(() => {
     loadDashboardData();
@@ -179,15 +178,15 @@ function Dashboard({ user, onLogout }) {
 
   const getEventIcon = (type) => {
     const icons = {
-      'auth_success': '✅',
-      'auth_failed': '❌',
-      'passkey_enrolled': '🔑',
-      'passkey_revoked': '🗑️',
-      'user_created': '👤',
-      'access_denied': '🚫',
-      'policy_changed': '⚙️'
+      'auth_success': '',
+      'auth_failed': '',
+      'passkey_enrolled': '',
+      'passkey_revoked': '',
+      'user_created': '',
+      'access_denied': '',
+      'policy_changed': ''
     };
-    return icons[type] || '📝';
+    return icons[type] || '';
   };
 
   const getEventLabel = (type) => {
@@ -198,7 +197,19 @@ function Dashboard({ user, onLogout }) {
       'passkey_revoked': 'Passkey revocada',
       'user_created': 'Usuario creado',
       'access_denied': 'Acceso denegado',
-      'policy_changed': 'Política modificada'
+      'policy_changed': 'Política modificada',
+      'logout': 'Cierre de sesión',
+      'session_revoked': 'Sesión revocada',
+      'session_ip_changed': 'Cambio de IP en la sesión',
+      'stepup_requested': 'Verificación adicional solicitada',
+      'stepup_success': 'Verificación adicional superada',
+      'stepup_failed': 'Verificación adicional fallida',
+      'stepup_approval_requested': 'Aprobación de supervisor solicitada',
+      'stepup_approved': 'Acceso aprobado por supervisor',
+      'stepup_denied': 'Acceso rechazado por supervisor',
+      'reauth_success': 'Identidad reconfirmada',
+      'auth_aborted': 'Inicio de sesión cancelado',
+      'account_recovery_started': 'Recuperación de cuenta iniciada'
     };
     return labels[type] || type;
   };
@@ -222,30 +233,15 @@ function Dashboard({ user, onLogout }) {
     <div className="dashboard-container">
       <div className="dashboard-header">
         <div className="user-info">
-          <h2>👤 {user.display_name || user.email}</h2>
-          <p className="user-email">{user.email}</p>
-        </div>
-        <div className="header-actions">
-          {isAdmin && (
-            <button onClick={() => navigate('/admin')} className="btn-admin">
-              ⚙️ Panel Admin
-            </button>
-          )}
-          {canAudit && (
-            <button onClick={() => navigate('/audit')} className="btn-admin">
-              📑 Auditoría
-            </button>
-          )}
-          <button onClick={onLogout} className="btn-logout">
-            🚪 Cerrar Sesión
-          </button>
+          <h2>Mi cuenta</h2>
+          <p className="user-email">{user.display_name ? `${user.display_name}, ${user.email}` : user.email}</p>
         </div>
       </div>
 
       {riskInfo && (
         <div className="risk-summary">
           <div className="risk-card">
-            <h4>📊 Nivel de Riesgo Actual</h4>
+            <h4>Riesgo promedio de los accesos (7 días)</h4>
             <div className="risk-score">
               <span className={`risk-badge ${getRiskLevel(riskInfo.summary?.average_risk_score || 0).class}`}>
                 {getRiskLevel(riskInfo.summary?.average_risk_score || 0).label}
@@ -254,7 +250,7 @@ function Dashboard({ user, onLogout }) {
             </div>
           </div>
           <div className="risk-card">
-            <h4>🔍 Evaluaciones (7 días)</h4>
+            <h4>Evaluaciones de riesgo (7 días)</h4>
             <div className="risk-number">{riskInfo.summary?.total_evaluations || 0}</div>
           </div>
         </div>
@@ -265,26 +261,26 @@ function Dashboard({ user, onLogout }) {
           className={`tab ${activeTab === 'passkeys' ? 'active' : ''}`}
           onClick={() => setActiveTab('passkeys')}
         >
-          🔑 Mis Passkeys ({passkeys.length})
+          Mis Passkeys ({passkeys.length})
         </button>
         <button 
           className={`tab ${activeTab === 'audit' ? 'active' : ''}`}
           onClick={() => setActiveTab('audit')}
         >
-          📋 Historial de Acceso
+          Historial de Acceso
         </button>
         <button
           className={`tab ${activeTab === 'sessions' ? 'active' : ''}`}
           onClick={() => setActiveTab('sessions')}
         >
-          💻 Sesiones activas ({sessions.length})
+          Sesiones activas ({sessions.length})
         </button>
         {canAudit && (
           <button
             className={`tab ${activeTab === 'stats' ? 'active' : ''}`}
             onClick={() => setActiveTab('stats')}
           >
-            📊 Estadísticas del Sistema
+            Estadísticas del Sistema
           </button>
         )}
       </div>
@@ -301,25 +297,25 @@ function Dashboard({ user, onLogout }) {
 
             {passkeys.length === 0 ? (
               <div className="empty-state">
-                <div className="empty-icon">🔑</div>
+                <div className="empty-icon"></div>
                 <h4>No tienes Passkeys enroladas</h4>
                 <p>Crea tu primera passkey para acceder de forma segura sin contraseñas</p>
                 <button className="btn-primary" onClick={() => navigate('/enroll')}>
-                  ➕ Enrolar Nueva Passkey
+                  Enrolar Nueva Passkey
                 </button>
               </div>
             ) : (
               <>
                 <div className="passkeys-stats">
                   <div className="stat-item">
-                    <span className="stat-icon">🔑</span>
+                    <span className="stat-icon"></span>
                     <div>
                       <div className="stat-number">{passkeys.length}</div>
                       <div className="stat-label">Passkeys activas</div>
                     </div>
                   </div>
                   <div className="stat-item">
-                    <span className="stat-icon">💻</span>
+                    <span className="stat-icon"></span>
                     <div>
                       <div className="stat-number">
                         {passkeys.filter(pk => pk.device_type === 'multi_device').length}
@@ -328,7 +324,7 @@ function Dashboard({ user, onLogout }) {
                     </div>
                   </div>
                   <div className="stat-item">
-                    <span className="stat-icon">🔐</span>
+                    <span className="stat-icon"></span>
                     <div>
                       <div className="stat-number">
                         {passkeys.filter(pk => pk.device_type !== 'multi_device').length}
@@ -343,7 +339,7 @@ function Dashboard({ user, onLogout }) {
                     <div key={passkey.id} className="passkey-card-enhanced">
                       <div className="passkey-card-header">
                         <div className="passkey-icon-large">
-                          {passkey.device_type === 'multi_device' ? '☁️' : '🔑'}
+                          {passkey.device_type === 'multi_device' ? '' : ''}
                         </div>
                         <div className="passkey-status">
                           <span className="status-badge active">● Activa</span>
@@ -384,14 +380,14 @@ function Dashboard({ user, onLogout }) {
                                 onClick={() => handleRenamePasskey(passkey)}
                                 title="Renombrar"
                               >
-                                ✏️
+                                Renombrar
                               </button>
                             </h4>
                             <p className="passkey-type">
                               <span className="type-badge">
                                 {passkey.device_type === 'multi_device' ?
-                                  '☁️ Sincronizada (gestor de passkeys)' :
-                                  '🔐 Ligada a un solo dispositivo'}
+                                  'Sincronizada (gestor de passkeys)' :
+                                  'Ligada a un solo dispositivo'}
                               </span>
                             </p>
                           </>
@@ -399,14 +395,14 @@ function Dashboard({ user, onLogout }) {
 
                         <div className="passkey-dates">
                           <div className="date-item">
-                            <span className="date-icon">📅</span>
+                            <span className="date-icon"></span>
                             <div>
                               <div className="date-label">Creada</div>
                               <div className="date-value">{formatDate(passkey.created_at)}</div>
                             </div>
                           </div>
                           <div className="date-item">
-                            <span className="date-icon">⏱️</span>
+                            <span className="date-icon"></span>
                             <div>
                               <div className="date-label">Último uso</div>
                               <div className="date-value">
@@ -432,7 +428,7 @@ function Dashboard({ user, onLogout }) {
                           disabled={passkeys.length <= 1}
                           title={passkeys.length <= 1 ? 'Es tu única passkey: agregá otra antes de revocarla' : ''}
                         >
-                          🗑️ Revocar Passkey
+                          Revocar Passkey
                         </button>
                         {passkeys.length <= 1 && (
                           <p className="revoke-hint">
@@ -451,7 +447,7 @@ function Dashboard({ user, onLogout }) {
                     disabled={passkeys.length >= 5}
                     title={passkeys.length >= 5 ? 'Máximo 5 passkeys por usuario' : ''}
                   >
-                    ➕ Agregar Nueva Passkey {passkeys.length >= 5 ? '(máximo alcanzado)' : ''}
+                    Agregar Nueva Passkey {passkeys.length >= 5 ? '(máximo alcanzado)' : ''}
                   </button>
                 </div>
               </>
@@ -498,7 +494,7 @@ function Dashboard({ user, onLogout }) {
 
             {auditEvents.length === 0 ? (
               <div className="empty-state">
-                <div className="empty-icon">📋</div>
+                <div className="empty-icon"></div>
                 <h4>No hay eventos registrados</h4>
                 <p>Los eventos de seguridad aparecerán aquí</p>
               </div>
@@ -554,7 +550,7 @@ function Dashboard({ user, onLogout }) {
 
             <div className="stats-grid">
               <div className="stat-card">
-                <div className="stat-icon-big">✅</div>
+                <div className="stat-icon-big"></div>
                 <div className="stat-info">
                   <div className="stat-big-number">{stats.authentication?.success || 0}</div>
                   <div className="stat-big-label">Autenticaciones exitosas</div>
@@ -562,7 +558,7 @@ function Dashboard({ user, onLogout }) {
               </div>
 
               <div className="stat-card">
-                <div className="stat-icon-big">❌</div>
+                <div className="stat-icon-big"></div>
                 <div className="stat-info">
                   <div className="stat-big-number">{stats.authentication?.failed || 0}</div>
                   <div className="stat-big-label">Intentos fallidos</div>
@@ -570,7 +566,7 @@ function Dashboard({ user, onLogout }) {
               </div>
 
               <div className="stat-card">
-                <div className="stat-icon-big">📊</div>
+                <div className="stat-icon-big"></div>
                 <div className="stat-info">
                   <div className="stat-big-number">{stats.authentication?.success_rate || '0%'}</div>
                   <div className="stat-big-label">Tasa de éxito</div>

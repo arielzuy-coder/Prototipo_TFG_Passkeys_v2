@@ -116,7 +116,7 @@ function AdminUsers({ currentUser }) {
       {message.text && <div className={`message ${message.type}`}>{message.text}</div>}
 
       <section className="au-section">
-        <h3>🧑‍💼 Solicitudes de aprobación (step-up)</h3>
+        <h3>Solicitudes de aprobación (step-up)</h3>
         <p className="au-hint">Accesos que pidieron aprobación manual. Revisá el contexto antes de aprobar.</p>
         {pending.length === 0 ? (
           <p className="au-hint">No hay accesos esperando aprobación.</p>
@@ -144,7 +144,7 @@ function AdminUsers({ currentUser }) {
       </section>
 
       <section className="au-section">
-        <h3>➕ Alta de usuario</h3>
+        <h3>Alta de usuario</h3>
         <p className="au-hint">
           Se crea pendiente y se genera un link de invitación de un solo uso para enrolar su primera passkey.
         </p>
@@ -172,14 +172,14 @@ function AdminUsers({ currentUser }) {
 
         {invitation && (
           <div className="info-box au-invite">
-            <h4>🔗 Invitación {invitation.purpose === 'recovery' ? 'de recuperación' : 'de alta'} para {invitation.email}</h4>
+            <h4>Invitación {invitation.purpose === 'recovery' ? 'de recuperación' : 'de alta'} para {invitation.email}</h4>
             <p>
               Un solo uso, vence {new Date(invitation.expires_at).toLocaleString('es-AR')}. No se vuelve a mostrar:
               entregala por un canal seguro.
             </p>
             <input type="text" readOnly value={invitation.url} onFocus={(e) => e.target.select()} />
             <div className="au-actions">
-              <button className="btn-secondary" onClick={() => copy(invitation.url)}>📋 Copiar</button>
+              <button className="btn-secondary" onClick={() => copy(invitation.url)}>Copiar</button>
               <button className="btn-secondary" onClick={() => setInvitation(null)}>Ocultar</button>
             </div>
           </div>
@@ -187,7 +187,7 @@ function AdminUsers({ currentUser }) {
       </section>
 
       <section className="au-section">
-        <h3>👥 Usuarios ({users.length})</h3>
+        <h3>Usuarios ({users.length})</h3>
         <div className="au-list">
           {users.map((u) => {
             const self = u.id === currentUser?.id;
@@ -207,15 +207,15 @@ function AdminUsers({ currentUser }) {
                 {!self && (
                   <div className="au-actions">
                     {u.status === 'pending' && (
-                      <button className="btn-secondary" disabled={busy} onClick={() => actions.reinvite(u)}>🔗 Reemitir invitación</button>
+                      <button className="btn-secondary" disabled={busy} onClick={() => actions.reinvite(u)}>Reemitir invitación</button>
                     )}
                     {u.status !== 'suspended' && (
-                      <button className="btn-secondary" disabled={busy} onClick={() => actions.recovery(u)}>🔄 Recuperación</button>
+                      <button className="btn-secondary" disabled={busy} onClick={() => actions.recovery(u)}>Recuperación</button>
                     )}
                     {u.status === 'suspended' ? (
-                      <button className="btn-secondary" disabled={busy} onClick={() => actions.reactivate(u)}>▶ Reactivar</button>
+                      <button className="btn-secondary" disabled={busy} onClick={() => actions.reactivate(u)}>Reactivar</button>
                     ) : (
-                      <button className="btn-danger" disabled={busy} onClick={() => actions.suspend(u)}>⛔ Suspender</button>
+                      <button className="btn-danger" disabled={busy} onClick={() => actions.suspend(u)}>Suspender</button>
                     )}
                   </div>
                 )}
@@ -226,7 +226,7 @@ function AdminUsers({ currentUser }) {
       </section>
 
       <section className="au-section">
-        <h3>🌐 Diagnóstico de red</h3>
+        <h3>Diagnóstico de red</h3>
         <p className="au-hint">
           Verifica que el servidor vea tu IP pública real detrás del proxy (configuración TRUSTED_PROXY_HOPS).
         </p>

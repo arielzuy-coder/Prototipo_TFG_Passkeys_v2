@@ -58,12 +58,12 @@ function LoginPasswordless({ onLogin }) {
           setRequiresStepUp(true);
           setMessage({ 
             type: 'warning', 
-            text: '⚠️ Se requiere verificación adicional debido al nivel de riesgo detectado' 
+            text: 'Se requiere verificación adicional debido al nivel de riesgo detectado' 
           });
         } else {
           setMessage({ 
             type: 'success', 
-            text: '✅ Autenticación exitosa. Accediendo al sistema...' 
+            text: 'Autenticación exitosa. Accediendo al sistema...' 
           });
           
           setTimeout(() => {
@@ -78,7 +78,7 @@ function LoginPasswordless({ onLogin }) {
       if (error.response?.status === 403) {
         setMessage({ 
           type: 'error', 
-          text: '🚫 Acceso denegado: ' + (error.response.data.detail?.message || 'Riesgo demasiado alto')
+          text: 'Acceso denegado: ' + (error.response.data.detail?.message || 'Riesgo demasiado alto')
         });
         if (error.response.data.detail?.risk_score) {
           setRiskAssessment({
@@ -98,7 +98,7 @@ function LoginPasswordless({ onLogin }) {
   const handleStepUpSuccess = (user, tokens) => {
     setMessage({ 
       type: 'success', 
-      text: '✅ Verificación exitosa. Accediendo al sistema...' 
+      text: 'Verificación exitosa. Accediendo al sistema...' 
     });
     setTimeout(() => {
       onLogin(user, tokens);
@@ -128,14 +128,14 @@ function LoginPasswordless({ onLogin }) {
   return (
     <div className="auth-container">
       <div className="auth-card">
-        <h2>🔐 Inicio de Sesión</h2>
+        <h2>Inicio de Sesión</h2>
         <p className="auth-subtitle">
           Autenticación passwordless con evaluación de riesgo Zero Trust
         </p>
 
         <form onSubmit={handleLogin} className="auth-form">
           <div className="form-group">
-            <label htmlFor="email">📧 Email</label>
+            <label htmlFor="email">Email</label>
             <input
               type="email"
               id="email"
@@ -168,7 +168,7 @@ function LoginPasswordless({ onLogin }) {
                 Autenticando...
               </>
             ) : (
-              '🔑 Iniciar Sesión'
+              'Iniciar Sesión'
             )}
           </button>
         </form>
@@ -184,15 +184,15 @@ function LoginPasswordless({ onLogin }) {
         </div>
 
         <div className="info-box">
-          <h4>🛡️ Seguridad Zero Trust Activada</h4>
+          <h4>Seguridad Zero Trust Activada</h4>
           <p>
             Este sistema evalúa continuamente el contexto de tu acceso:
           </p>
           <ul>
-            <li>✅ Dispositivo utilizado</li>
-            <li>✅ Ubicación geográfica</li>
-            <li>✅ Horario de acceso</li>
-            <li>✅ Comportamiento histórico</li>
+            <li>Dispositivo utilizado</li>
+            <li>Ubicación geográfica</li>
+            <li>Horario de acceso</li>
+            <li>Comportamiento histórico</li>
           </ul>
           <p className="note">
             Si detectamos actividad inusual, solicitaremos verificación adicional.

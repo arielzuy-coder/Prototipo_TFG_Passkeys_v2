@@ -189,7 +189,7 @@ function AdminPanel({ user }) {
   const getActionBadge = (action) => {
     const badges = {
       allow: { class: 'badge-success', text: '✓ Permitir' },
-      stepup: { class: 'badge-warning', text: '⚠ Step-up' },
+      stepup: { class: 'badge-warning', text: 'Step-up' },
       deny: { class: 'badge-danger', text: '✗ Denegar' }
     };
     return badges[action] || badges.allow;
@@ -200,7 +200,7 @@ function AdminPanel({ user }) {
       <div className="admin-container">
         <div className="admin-card">
           <div className="admin-header">
-            <h2>{editingPolicy ? '✏️ Editar Política' : '➕ Nueva Política'}</h2>
+            <h2>{editingPolicy ? 'Editar Política' : 'Nueva Política'}</h2>
             <button 
               className="btn-secondary" 
               onClick={() => setShowForm(false)}
@@ -299,7 +299,7 @@ function AdminPanel({ user }) {
                   disabled={loading}
                 >
                   <option value="allow">✓ Permitir acceso</option>
-                  <option value="stepup">⚠ Requerir step-up</option>
+                  <option value="stepup">Requerir step-up</option>
                   <option value="deny">✗ Denegar acceso</option>
                 </select>
               </div>
@@ -359,7 +359,7 @@ function AdminPanel({ user }) {
         {/* Header Principal */}
         <div className="admin-header">
           <div>
-            <h2>⚙️ Panel de Administración</h2>
+            <h2>Panel de Administración</h2>
             <p className="subtitle">Gestión de políticas de acceso y seguridad</p>
           </div>
         </div>
@@ -370,19 +370,19 @@ function AdminPanel({ user }) {
             className={`tab-button ${activeTab === 'policies' ? 'active' : ''}`}
             onClick={() => setActiveTab('policies')}
           >
-            <span>🔒</span> Políticas de Acceso
+            <span></span> Políticas de Acceso
           </button>
           <button
             className={`tab-button ${activeTab === 'users' ? 'active' : ''}`}
             onClick={() => setActiveTab('users')}
           >
-            <span>👥</span> Usuarios y Aprobaciones
+            <span></span> Usuarios y Aprobaciones
           </button>
           <button 
             className={`tab-button ${activeTab === 'audit' ? 'active' : ''}`}
             onClick={() => setActiveTab('audit')}
           >
-            <span>📊</span> Auditoría y Reportes
+            <span></span> Auditoría y Reportes
           </button>
         </div>
 
@@ -392,7 +392,7 @@ function AdminPanel({ user }) {
           <div className="policies-content">
             <div className="policies-header">
               <div className="header-title">
-                <span className="icon">🔒</span>
+                <span className="icon"></span>
                 <div>
                   <h2>Políticas de Acceso</h2>
                   <p className="subtitle">Gestión de políticas de acceso y seguridad</p>
@@ -402,7 +402,7 @@ function AdminPanel({ user }) {
                 className="btn-primary" 
                 onClick={handleCreate}
               >
-                ➕ Nueva Política
+                Nueva Política
               </button>
             </div>
 
@@ -474,12 +474,12 @@ function AdminPanel({ user }) {
                             )}
                             {policy.conditions.allowed_countries && (
                               <span title="Países permitidos">
-                                🌍 {policy.conditions.allowed_countries.join(', ')} 
+                                {policy.conditions.allowed_countries.join(', ')} 
                               </span>
                             )}
                             {policy.conditions.blocked_countries && (
                               <span title="Países bloqueados">
-                                🚫 {policy.conditions.blocked_countries.join(', ')} 
+                                {policy.conditions.blocked_countries.join(', ')} 
                               </span>
                             )}
                           </td>
@@ -495,14 +495,14 @@ function AdminPanel({ user }) {
                               onClick={() => handleEdit(policy)}
                               title="Editar"
                             >
-                              ✏️
+                              Editar
                             </button>
                             <button
                               className="btn-icon btn-delete"
                               onClick={() => handleDelete(policy)}
                               title="Eliminar"
                             >
-                              🗑️
+                              Eliminar
                             </button>
                           </td>
                         </tr>

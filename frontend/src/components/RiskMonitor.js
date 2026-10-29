@@ -41,9 +41,9 @@ function RiskMonitor({ user }) {
   };
 
   const getRiskLevel = (score) => {
-    if (score < 40) return { label: 'BAJO', class: 'low', color: '#28a745', icon: '✅' };
-    if (score < 75) return { label: 'MEDIO', class: 'medium', color: '#ffc107', icon: '⚠️' };
-    return { label: 'ALTO', class: 'high', color: '#dc3545', icon: '🚨' };
+    if (score < 40) return { label: 'BAJO', class: 'low', color: '#28a745', icon: '' };
+    if (score < 75) return { label: 'MEDIO', class: 'medium', color: '#ffc107', icon: '' };
+    return { label: 'ALTO', class: 'high', color: '#dc3545', icon: '' };
   };
 
   const formatDate = (dateString) => {
@@ -90,7 +90,7 @@ function RiskMonitor({ user }) {
   return (
     <div className="risk-monitor-container">
       <div className="risk-monitor-header">
-        <h3>📊 Evaluación de Riesgo en Tiempo Real</h3>
+        <h3>Evaluación de Riesgo en Tiempo Real</h3>
         <div className="risk-monitor-controls">
           <label className="auto-refresh-toggle">
             <input
@@ -105,7 +105,7 @@ function RiskMonitor({ user }) {
             onClick={loadRiskData}
             title="Actualizar ahora"
           >
-            🔄 Actualizar
+            Actualizar
           </button>
         </div>
       </div>
@@ -152,7 +152,7 @@ function RiskMonitor({ user }) {
 
         <div className="risk-details">
           <div className="risk-detail-item">
-            <span className="risk-detail-icon">⏱️</span>
+            <span className="risk-detail-icon"></span>
             <div>
               <div className="risk-detail-label">Última evaluación</div>
               <div className="risk-detail-value">
@@ -162,7 +162,7 @@ function RiskMonitor({ user }) {
           </div>
 
           <div className="risk-detail-item">
-            <span className="risk-detail-icon">📍</span>
+            <span className="risk-detail-icon"></span>
             <div>
               <div className="risk-detail-label">Ubicación actual</div>
               <div className="risk-detail-value">
@@ -172,7 +172,7 @@ function RiskMonitor({ user }) {
           </div>
 
           <div className="risk-detail-item">
-            <span className="risk-detail-icon">💻</span>
+            <span className="risk-detail-icon"></span>
             <div>
               <div className="risk-detail-label">Dispositivo</div>
               <div className="risk-detail-value">
@@ -182,7 +182,7 @@ function RiskMonitor({ user }) {
           </div>
 
           <div className="risk-detail-item">
-            <span className="risk-detail-icon">🕐</span>
+            <span className="risk-detail-icon"></span>
             <div>
               <div className="risk-detail-label">Horario</div>
               <div className="risk-detail-value">
@@ -196,7 +196,7 @@ function RiskMonitor({ user }) {
       {/* Factores de riesgo detectados */}
       {currentRisk.risk_factors && Object.keys(currentRisk.risk_factors).length > 0 && (
         <div className="risk-factors-panel">
-          <h4>🔍 Factores de Riesgo Detectados</h4>
+          <h4>Factores de Riesgo Detectados</h4>
           <div className="risk-factors-grid">
             {Object.entries(currentRisk.risk_factors).map(([factor, score]) => (
               <div key={factor} className="risk-factor-item">
@@ -220,7 +220,7 @@ function RiskMonitor({ user }) {
 
       {/* Historial de evaluaciones */}
       <div className="risk-history-panel">
-        <h4>📈 Historial de Evaluaciones (últimas 10)</h4>
+        <h4>Historial de Evaluaciones (últimas 10)</h4>
         {riskHistory.length === 0 ? (
           <p className="empty-text">No hay historial disponible</p>
         ) : (
@@ -254,23 +254,23 @@ function RiskMonitor({ user }) {
       {riskData.summary && (
         <div className="risk-summary-stats">
           <div className="risk-stat-card">
-            <div className="risk-stat-icon">📊</div>
+            <div className="risk-stat-icon"></div>
             <div className="risk-stat-info">
               <div className="risk-stat-number">{riskData.summary.total_evaluations}</div>
               <div className="risk-stat-label">Evaluaciones totales</div>
             </div>
           </div>
           <div className="risk-stat-card">
-            <div className="risk-stat-icon">📈</div>
+            <div className="risk-stat-icon"></div>
             <div className="risk-stat-info">
               <div className="risk-stat-number">{riskData.summary.average_risk_score.toFixed(1)}</div>
               <div className="risk-stat-label">Score promedio</div>
             </div>
           </div>
           <div className="risk-stat-card">
-            <div className="risk-stat-icon">⚠️</div>
+            <div className="risk-stat-icon"></div>
             <div className="risk-stat-info">
-              <div className="risk-stat-number">{riskData.summary.high_risk_count}</div>
+              <div className="risk-stat-number">{riskData.summary.high_risk_count ?? 0}</div>
               <div className="risk-stat-label">Alertas de riesgo alto</div>
             </div>
           </div>

@@ -54,13 +54,13 @@ function ReauthPrompt() {
   return (
     <div className="reauth-overlay" role="dialog" aria-modal="true" aria-labelledby="reauth-title">
       <div className="reauth-dialog">
-        <h3 id="reauth-title">🔐 Confirmá tu identidad</h3>
+        <h3 id="reauth-title">Confirmá tu identidad</h3>
         <p>{REASONS[request.reason] || request.message}</p>
         <p className="au-hint">Vas a usar tu passkey (huella, rostro o PIN del dispositivo).</p>
         {error && <div className="message error">{error}</div>}
         <div className="au-actions">
           <button className="btn-primary" onClick={confirm} disabled={busy}>
-            {busy ? 'Verificando...' : '👆 Confirmar con Passkey'}
+            {busy ? 'Verificando...' : 'Confirmar con Passkey'}
           </button>
           <button className="btn-secondary" onClick={cancel} disabled={busy}>Cancelar</button>
         </div>
