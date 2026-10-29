@@ -19,7 +19,7 @@ services:
     envVars:
       - key: DATABASE_URL
         fromDatabase:
-          name: auth-postgres
+          name: zuy-tfg-passkeys-db
           property: connectionString
       - key: SECRET_KEY
         generateValue: true
@@ -67,7 +67,7 @@ services:
 
 databases:
   # Plan pago: el gratuito vence a los 30 días y se borra
-  - name: auth-postgres
+  - name: zuy-tfg-passkeys-db
     databaseName: auth_passkeys
     user: authuser
     region: virginia
