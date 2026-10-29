@@ -25,11 +25,11 @@ La librería `webauthn` (py_webauthn 1.11) está en `requirements.txt` y se impo
 | H4 | Ningún endpoint valida el JWT; admin abierto | Crítica | ✅ Corregido |
 | H5 | OTP de step-up devuelto en la respuesta y escrito en el log | Alta | ✅ Corregido |
 | H6 | `verify_token` lanza `AttributeError` ante un token inválido | Media | ✅ Corregido |
-| H7 | Fingerprint de dispositivo por User-Agent y no atado al usuario | Alta | 🟡 Parcial: atado al usuario; sigue basado en User-Agent |
+| H7 | Fingerprint de dispositivo por User-Agent y no atado al usuario | Alta | ✅ Corregido (fase 3: dispositivo atado a la passkey) |
 | H8 | CORS con credenciales para cualquier `*.onrender.com` | Alta | ✅ Corregido |
-| H9 | IP de cliente detrás de proxy / IPs privadas tratadas como Argentina | Media | ⏳ Pendiente (fase 3) |
+| H9 | IP de cliente detrás de proxy / IPs privadas tratadas como Argentina | Media | ✅ Corregido (fase 3: proxies de confianza configurables) |
 | H10 | Estado efímero en memoria (challenges, step-up) | Media | ✅ Corregido |
-| H11 | OTP generado con `random` y sin límite de intentos | Media | 🟡 Parcial: step-up limitado; falta límite en login |
+| H11 | OTP generado con `random` y sin límite de intentos | Media | ✅ Corregido (fase 3: límites por IP y cuenta) |
 | H12 | Errores internos expuestos al cliente (`detail=str(e)`) | Baja | ✅ Corregido |
 | H13 | Dependencias faltantes y desactualizadas | Baja | ✅ Corregido |
 | H14 | Políticas `new_device` / `unusual_location` nunca se evaluaban (siempre coincidían) | Media | ✅ Corregido (hallado en v2) |

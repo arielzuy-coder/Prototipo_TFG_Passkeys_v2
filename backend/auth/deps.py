@@ -4,7 +4,8 @@ Dependencias de autenticación y autorización (RBAC).
 Perfiles según la Tabla 4 de la tesis:
   - user:    sus propias passkeys e historial
   - auditor: lectura de auditoría, reportes y métricas (sin cambios de configuración)
-  - admin:   usuarios, invitaciones, políticas y aprobación de step-up
+  - admin:   usuarios, invitaciones, políticas y aprobación de step-up;
+             las operaciones que modifican algo exigen re-autenticación reciente
 """
 from dataclasses import dataclass
 from typing import Dict
@@ -12,6 +13,7 @@ from typing import Dict
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session as DBSession
 
+from auth.continuous import require_recent_strong_auth, verify_session_context
 from auth.session_manager import SessionManager
 from auth.token_manager import TokenManager
 from database import get_db
@@ -43,7 +45,7 @@ class CurrentUser:
         return self.user.role
 
 
-def get_current_user(request: Request, db: DBSession = Depends(get_db)) -> CurrentUser:
+def _authenticate(request: Request, db: DBSession) -> CurrentUser:
     header = request.headers.get("authorization", "")
     scheme, _, token = header.partition(" ")
     if scheme.lower() != "bearer" or not token:
@@ -64,6 +66,22 @@ def get_current_user(request: Request, db: DBSession = Depends(get_db)) -> Curre
     return CurrentUser(user=user, session=session, claims=claims)
 
 
+def get_session_user(request: Request, db: DBSession = Depends(get_db)) -> CurrentUser:
+    """Token y sesión válidos, sin reevaluar el contexto. Solo para re-autenticación y logout."""
+    from auth.continuous import check_device
+
+    current = _authenticate(request, db)
+    check_device(db, request, current.session)
+    return current
+
+
+def get_current_user(request: Request, db: DBSession = Depends(get_db)) -> CurrentUser:
+    """Token y sesión válidos + verificación continua del contexto (UC-03)."""
+    current = _authenticate(request, db)
+    verify_session_context(db, request, current.session, current.user)
+    return current
+
+
 def require_roles(*roles: str):
     """El rol se lee de la base en cada request: un cambio de rol aplica de inmediato."""
 
@@ -77,3 +95,9 @@ def require_roles(*roles: str):
 
 require_admin = require_roles(ROLE_ADMIN)
 require_audit_reader = require_roles(ROLE_ADMIN, ROLE_AUDITOR)
+
+
+def require_admin_reauth(current: CurrentUser = Depends(require_admin)) -> CurrentUser:
+    """Administrador con autenticación fuerte reciente (para operaciones que modifican algo)."""
+    require_recent_strong_auth(current.session)
+    return current

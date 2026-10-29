@@ -1,4 +1,5 @@
 """Utilidades compartidas: auditoría, invitaciones, dispositivos, serialización."""
+import ipaddress
 import logging
 import secrets
 import uuid
@@ -17,8 +18,33 @@ from models import AuditEvent, Device, Invitation, User
 logger = logging.getLogger(__name__)
 
 
+def _valid_ip(value: str) -> bool:
+    try:
+        ipaddress.ip_address(value)
+        return True
+    except ValueError:
+        return False
+
+
 def client_ip(request: Request) -> str:
-    return request.client.host if request.client else "unknown"
+    """
+    IP real del cliente.
+
+    Detrás de un proxy, la IP de la conexión es la del proxy. El cliente puede mandar su propio
+    X-Forwarded-For, así que solo se confía en las últimas TRUSTED_PROXY_HOPS entradas (las que
+    agregaron proxies propios) o en un header que el proxy sobrescribe (CLIENT_IP_HEADER).
+    """
+    peer = request.client.host if request.client else "unknown"
+    if settings.CLIENT_IP_HEADER:
+        value = (request.headers.get(settings.CLIENT_IP_HEADER) or "").strip()
+        if _valid_ip(value):
+            return value
+    hops = settings.TRUSTED_PROXY_HOPS
+    if hops > 0:
+        chain = [p.strip() for p in request.headers.get("x-forwarded-for", "").split(",") if p.strip()]
+        if len(chain) >= hops and _valid_ip(chain[-hops]):
+            return chain[-hops]
+    return peer
 
 
 def user_agent(request: Request) -> str:
@@ -105,34 +131,41 @@ def device_fingerprint(ua_string: str) -> str:
 
 
 def touch_device(db: DBSession, user: User, request: Request, location: Optional[str],
-                 device_name: Optional[str] = None, create: bool = False) -> None:
-    """Actualiza (o crea, si create=True) el dispositivo del usuario. Nunca toca dispositivos de otro."""
+                 device_name: Optional[str] = None, create: bool = False,
+                 credential_id: Optional[str] = None) -> None:
+    """
+    Actualiza el dispositivo del usuario y registra la passkey verificada desde él.
+    create=True lo crea si no existe (enrolamiento o step-up superado). Nunca toca dispositivos de otro.
+    """
     ua_string = user_agent(request)
     fp = device_fingerprint(ua_string)
     device = db.query(Device).filter(Device.device_fingerprint == fp, Device.user_id == user.id).first()
-    if device:
-        device.last_seen_at = datetime.utcnow()
-        device.last_seen_ip = client_ip(request)
-        if location:
-            device.last_seen_location = location
-        db.commit()
+    if device is None:
+        if not create:
+            return
+        ua = user_agents.parse(ua_string)
+        try:
+            with db.begin_nested():
+                db.add(Device(
+                    user_id=user.id,
+                    device_fingerprint=fp,
+                    device_name=device_name or "Dispositivo sin nombre",
+                    os=ua.os.family,
+                    browser=ua.browser.family,
+                    trust_level=50,
+                    last_seen_ip=client_ip(request),
+                    last_seen_location=location,
+                    credential_ids=[credential_id] if credential_id else [],
+                ))
+            db.commit()
+        except IntegrityError:
+            db.rollback()  # carrera entre dos requests del mismo usuario
         return
-    if not create:
-        return
-    ua = user_agents.parse(ua_string)
-    try:
-        with db.begin_nested():
-            db.add(Device(
-                user_id=user.id,
-                device_fingerprint=fp,
-                device_name=device_name or "Dispositivo sin nombre",
-                os=ua.os.family,
-                browser=ua.browser.family,
-                trust_level=50,
-                last_seen_ip=client_ip(request),
-                last_seen_location=location,
-            ))
-        db.commit()
-    except IntegrityError:
-        # Carrera entre dos requests del mismo usuario: el dispositivo ya existe
-        db.rollback()
+
+    device.last_seen_at = datetime.utcnow()
+    device.last_seen_ip = client_ip(request)
+    if location:
+        device.last_seen_location = location
+    if credential_id and credential_id not in (device.credential_ids or []):
+        device.credential_ids = [*(device.credential_ids or []), credential_id][-10:]
+    db.commit()

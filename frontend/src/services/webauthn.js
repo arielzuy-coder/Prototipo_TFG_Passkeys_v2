@@ -67,3 +67,16 @@ export const checkWebAuthnSupport = () => ({
   supported: !!window.PublicKeyCredential,
   message: window.PublicKeyCredential ? 'WebAuthn está soportado' : 'WebAuthn no está soportado en este navegador'
 });
+
+// Confirmar identidad dentro de una sesión abierta
+export const reauthenticate = async () => {
+  const { data: options } = await api.post('/auth/reauth/begin');
+  let credential;
+  try {
+    credential = await startAuthentication(options);
+  } catch (error) {
+    throw browserError(error);
+  }
+  const { data } = await api.post('/auth/reauth/complete', { credential });
+  return data;
+};

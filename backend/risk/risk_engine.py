@@ -5,8 +5,10 @@ from models import User, Device, AuditEvent
 import user_agents
 from decimal import Decimal
 import logging
-import requests
 import pytz
+
+from config import settings
+from risk import geo
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +34,8 @@ class RiskEngine:
         user: User,
         ip_address: str,
         user_agent: str,
-        db: DBSession
+        db: DBSession,
+        credential_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """Evalúa el riesgo contextual de un intento de autenticación."""
         
@@ -41,6 +44,7 @@ class RiskEngine:
         logger.info(f"[RISK ENGINE] IP: {ip_address}")
         
         context = self._build_context(user, ip_address, user_agent, db)
+        context['credential_id'] = credential_id
         
         factors = {
             'device': self._evaluate_device_risk(context, db),
@@ -137,6 +141,17 @@ class RiskEngine:
             Device.user_id == context['user_id']
         ).first()
         
+        # H7: la huella (User-Agent) se puede copiar. El dispositivo es de confianza solo si
+        # la passkey usada ya se verificó antes desde él.
+        credential_id = context.get('credential_id')
+        if known_device and credential_id and credential_id not in (known_device.credential_ids or []):
+            logger.info(f"[RISK ENGINE] ⚠️ Huella conocida pero la passkey nunca se usó desde este dispositivo")
+            return {
+                'score': 40,
+                'known': False,
+                'message': "Dispositivo no verificado con esta passkey"
+            }
+
         if known_device:
             logger.info(f"[RISK ENGINE] ✅ Dispositivo encontrado: {known_device.device_name}")
             return {
@@ -171,7 +186,7 @@ class RiskEngine:
         logger.info(f"[RISK ENGINE] Ubicación actual: {current_display} (País: {current_country})")
         
         # ✅ NUEVO: Países confiables (bajo riesgo automático)
-        trusted_countries = ['AR']  # Argentina
+        trusted_countries = settings.trusted_countries
         
         if current_country in trusted_countries:
             logger.info(f"[RISK ENGINE] ✅ País CONFIABLE: {current_country}")
@@ -258,15 +273,14 @@ class RiskEngine:
     ) -> Dict[str, Any]:
         """Evalúa intentos fallidos recientes."""
         
-        # Usar hora actual de Buenos Aires
-        utc_now = datetime.now(pytz.utc)
-        current_time_ba = utc_now.astimezone(self.timezone)
-        one_hour_ago = current_time_ba - timedelta(hours=1)
+        # Los timestamps de auditoría se guardan en UTC: la ventana se calcula en UTC.
+        # Solo cuentan fallos verificados por el servidor (no los que informa el cliente).
+        one_hour_ago = datetime.utcnow() - timedelta(hours=1)
         
         recent_failures = db.query(AuditEvent).filter(
             AuditEvent.user_id == user.id,
-            AuditEvent.event_type == 'auth_failed',
-            AuditEvent.timestamp >= one_hour_ago.replace(tzinfo=None)  # Comparar sin timezone
+            AuditEvent.event_type.in_(['auth_failed', 'stepup_failed']),
+            AuditEvent.timestamp >= one_hour_ago
         ).count()
         
         if recent_failures == 0:
@@ -292,15 +306,12 @@ class RiskEngine:
     ) -> Dict[str, Any]:
         """Evalúa la velocidad de intentos de autenticación."""
         
-        # Usar hora actual de Buenos Aires
-        utc_now = datetime.now(pytz.utc)
-        current_time_ba = utc_now.astimezone(self.timezone)
-        five_minutes_ago = current_time_ba - timedelta(minutes=5)
+        five_minutes_ago = datetime.utcnow() - timedelta(minutes=5)
         
         recent_attempts = db.query(AuditEvent).filter(
             AuditEvent.user_id == user.id,
             AuditEvent.event_type.in_(['auth_success', 'auth_failed']),
-            AuditEvent.timestamp >= five_minutes_ago.replace(tzinfo=None)  # Comparar sin timezone
+            AuditEvent.timestamp >= five_minutes_ago
         ).count()
         
         if recent_attempts <= 2:
@@ -333,60 +344,5 @@ class RiskEngine:
             return 'high'
     
     def _get_location_from_ip(self, ip_address: str) -> Dict[str, str]:
-        """Obtiene la ubicación aproximada desde la IP usando API de geolocalización."""
-        
-        # IPs locales
-        if ip_address.startswith('127.') or ip_address == 'localhost':
-            return {
-                'country': 'AR',  # Argentina por defecto en desarrollo
-                'country_name': 'Argentina',
-                'city': 'Buenos Aires',
-                'display': 'Localhost (Desarrollo)'
-            }
-        
-        if ip_address.startswith('192.168.') or ip_address.startswith('10.'):
-            return {
-                'country': 'AR',  # Argentina por defecto en red local
-                'country_name': 'Argentina',
-                'city': 'Red Local',
-                'display': 'Red Local'
-            }
-        
-        # Geolocalización real usando API gratuita
-        try:
-            # Usar ipapi.co (gratuito, 1000 req/día, no requiere API key)
-            response = requests.get(
-                f'https://ipapi.co/{ip_address}/json/',
-                timeout=2
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                country = data.get('country_code', 'Unknown')
-                country_name = data.get('country_name', 'Unknown')
-                city = data.get('city', 'Unknown')
-                
-                logger.info(f"[GEOLOCATION] IP: {ip_address} → {city}, {country_name} ({country})")
-                
-                return {
-                    'country': country,
-                    'country_name': country_name,
-                    'city': city,
-                    'display': f"{city}, {country_name}"
-                }
-            else:
-                logger.warning(f"[GEOLOCATION] API error: {response.status_code}")
-                
-        except requests.exceptions.Timeout:
-            logger.warning(f"[GEOLOCATION] Timeout para IP {ip_address}")
-        except Exception as e:
-            logger.error(f"[GEOLOCATION] Error: {e}")
-        
-        # Fallback si la API falla
-        return {
-            'country': 'Unknown',
-            'country_name': 'Unknown',
-            'city': 'Unknown',
-            'display': f"IP: {ip_address}"
-        }
+        """Ubicación aproximada de la IP (ver risk/geo.py)."""
+        return geo.lookup(ip_address)

@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session as DBSession
 
-from auth.deps import ROLES, CurrentUser, require_admin
+from auth.deps import ROLES, CurrentUser, require_admin, require_admin_reauth
 from auth.session_manager import SessionManager
 from database import get_db
 from models import Invitation, Passkey, Policy, StepUpTransaction, User
@@ -113,7 +113,7 @@ def list_users(current: CurrentUser = Depends(require_admin), db: DBSession = De
 
 @router.post("/users")
 def create_user(request: Request, data: UserCreateRequest,
-                current: CurrentUser = Depends(require_admin), db: DBSession = Depends(get_db)):
+                current: CurrentUser = Depends(require_admin_reauth), db: DBSession = Depends(get_db)):
     """Alta de usuario (pendiente) + invitación de un solo uso para enrolar su primera passkey."""
     if data.role not in ROLES:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Rol inválido. Opciones: {', '.join(ROLES)}")
@@ -135,7 +135,7 @@ def create_user(request: Request, data: UserCreateRequest,
 
 @router.post("/users/{user_id}/invitation")
 def reissue_invitation(user_id: str, request: Request,
-                       current: CurrentUser = Depends(require_admin), db: DBSession = Depends(get_db)):
+                       current: CurrentUser = Depends(require_admin_reauth), db: DBSession = Depends(get_db)):
     """Reemite la invitación de alta de un usuario que todavía no enroló su passkey."""
     user = _get_user(db, user_id)
     if user.status != "pending":
@@ -148,7 +148,7 @@ def reissue_invitation(user_id: str, request: Request,
 
 @router.post("/users/{user_id}/recovery")
 def start_recovery(user_id: str, request: Request,
-                   current: CurrentUser = Depends(require_admin), db: DBSession = Depends(get_db)):
+                   current: CurrentUser = Depends(require_admin_reauth), db: DBSession = Depends(get_db)):
     """
     Recuperación (pérdida de dispositivo o cuenta comprometida, sección 4 de Seguridad):
     revoca todas las passkeys y sesiones y emite una invitación de re-enrolamiento.
@@ -168,7 +168,7 @@ def start_recovery(user_id: str, request: Request,
 
 @router.post("/users/{user_id}/suspend")
 def suspend_user(user_id: str, request: Request,
-                 current: CurrentUser = Depends(require_admin), db: DBSession = Depends(get_db)):
+                 current: CurrentUser = Depends(require_admin_reauth), db: DBSession = Depends(get_db)):
     user = _get_user(db, user_id)
     _not_self(current, user, "suspender")
     user.status = "suspended"
@@ -181,7 +181,7 @@ def suspend_user(user_id: str, request: Request,
 
 @router.post("/users/{user_id}/reactivate")
 def reactivate_user(user_id: str, request: Request,
-                    current: CurrentUser = Depends(require_admin), db: DBSession = Depends(get_db)):
+                    current: CurrentUser = Depends(require_admin_reauth), db: DBSession = Depends(get_db)):
     user = _get_user(db, user_id)
     if user.status != "suspended":
         raise HTTPException(status.HTTP_409_CONFLICT, "El usuario no está suspendido")
@@ -194,7 +194,7 @@ def reactivate_user(user_id: str, request: Request,
 
 @router.put("/users/{user_id}/role")
 def change_role(user_id: str, request: Request, data: RoleUpdateRequest,
-                current: CurrentUser = Depends(require_admin), db: DBSession = Depends(get_db)):
+                current: CurrentUser = Depends(require_admin_reauth), db: DBSession = Depends(get_db)):
     if data.role not in ROLES:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Rol inválido. Opciones: {', '.join(ROLES)}")
     user = _get_user(db, user_id)
@@ -217,7 +217,7 @@ def list_user_passkeys(user_id: str, current: CurrentUser = Depends(require_admi
 
 @router.delete("/users/{user_id}/passkeys/{passkey_id}")
 def admin_revoke_passkey(user_id: str, passkey_id: str, request: Request,
-                         current: CurrentUser = Depends(require_admin), db: DBSession = Depends(get_db)):
+                         current: CurrentUser = Depends(require_admin_reauth), db: DBSession = Depends(get_db)):
     user = _get_user(db, user_id)
     passkey = db.query(Passkey).filter(Passkey.id == _uuid(passkey_id), Passkey.user_id == user.id).first()
     if passkey is None:
@@ -231,6 +231,26 @@ def admin_revoke_passkey(user_id: str, passkey_id: str, request: Request,
         session_manager.revoke_all_user_sessions(user.id, db)
         db.commit()
     return {"success": True}
+
+
+@router.get("/diagnostics/client-ip")
+def client_ip_diagnostics(request: Request, current: CurrentUser = Depends(require_admin)):
+    """Ayuda a configurar TRUSTED_PROXY_HOPS / CLIENT_IP_HEADER en el despliegue."""
+    from config import settings
+    from risk import geo
+    from services.common import client_ip
+    ip = client_ip(request)
+    return {
+        "connection_ip": request.client.host if request.client else None,
+        "x_forwarded_for": request.headers.get("x-forwarded-for"),
+        "true_client_ip": request.headers.get("true-client-ip"),
+        "x_real_ip": request.headers.get("x-real-ip"),
+        "trusted_proxy_hops": settings.TRUSTED_PROXY_HOPS,
+        "client_ip_header": settings.CLIENT_IP_HEADER,
+        "resolved_client_ip": ip,
+        "geolocation": geo.lookup(ip),
+        "hint": "resolved_client_ip debe ser tu IP pública. Si no lo es, ajustá TRUSTED_PROXY_HOPS.",
+    }
 
 
 # ============================================================================
@@ -273,13 +293,13 @@ def _review_stepup(db: DBSession, request: Request, current: CurrentUser, tx_id:
 
 
 @router.post("/stepup/{tx_id}/approve")
-def approve_stepup(tx_id: str, request: Request, current: CurrentUser = Depends(require_admin),
+def approve_stepup(tx_id: str, request: Request, current: CurrentUser = Depends(require_admin_reauth),
                    db: DBSession = Depends(get_db)):
     return _review_stepup(db, request, current, tx_id, True)
 
 
 @router.post("/stepup/{tx_id}/deny")
-def deny_stepup(tx_id: str, request: Request, current: CurrentUser = Depends(require_admin),
+def deny_stepup(tx_id: str, request: Request, current: CurrentUser = Depends(require_admin_reauth),
                 db: DBSession = Depends(get_db)):
     return _review_stepup(db, request, current, tx_id, False)
 
@@ -303,7 +323,7 @@ def get_policy(policy_id: str, current: CurrentUser = Depends(require_admin), db
 
 @router.post("/policies")
 def create_policy(request: Request, data: PolicyCreateRequest,
-                  current: CurrentUser = Depends(require_admin), db: DBSession = Depends(get_db)):
+                  current: CurrentUser = Depends(require_admin_reauth), db: DBSession = Depends(get_db)):
     if data.action not in VALID_ACTIONS:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "La acción debe ser 'allow', 'stepup' o 'deny'")
     if db.query(Policy).filter(Policy.name == data.name).first():
@@ -322,7 +342,7 @@ def create_policy(request: Request, data: PolicyCreateRequest,
 
 @router.put("/policies/{policy_id}")
 def update_policy(policy_id: str, request: Request, data: PolicyUpdateRequest,
-                  current: CurrentUser = Depends(require_admin), db: DBSession = Depends(get_db)):
+                  current: CurrentUser = Depends(require_admin_reauth), db: DBSession = Depends(get_db)):
     policy = db.query(Policy).filter(Policy.id == _uuid(policy_id)).first()
     if policy is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Política no encontrada")
@@ -340,7 +360,7 @@ def update_policy(policy_id: str, request: Request, data: PolicyUpdateRequest,
 
 @router.delete("/policies/{policy_id}")
 def delete_policy(policy_id: str, request: Request,
-                  current: CurrentUser = Depends(require_admin), db: DBSession = Depends(get_db)):
+                  current: CurrentUser = Depends(require_admin_reauth), db: DBSession = Depends(get_db)):
     policy = db.query(Policy).filter(Policy.id == _uuid(policy_id)).first()
     if policy is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Política no encontrada")
@@ -354,7 +374,7 @@ def delete_policy(policy_id: str, request: Request,
 
 @router.put("/policies/{policy_id}/toggle")
 def toggle_policy(policy_id: str, request: Request,
-                  current: CurrentUser = Depends(require_admin), db: DBSession = Depends(get_db)):
+                  current: CurrentUser = Depends(require_admin_reauth), db: DBSession = Depends(get_db)):
     policy = db.query(Policy).filter(Policy.id == _uuid(policy_id)).first()
     if policy is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Política no encontrada")

@@ -23,6 +23,13 @@ MIGRATIONS = [
     # Huella de dispositivo única por usuario, no global
     "ALTER TABLE devices DROP CONSTRAINT IF EXISTS devices_device_fingerprint_key",
     "CREATE UNIQUE INDEX IF NOT EXISTS uq_devices_user_fingerprint ON devices (user_id, device_fingerprint)",
+    # Fase 3: verificación continua, re-autenticación y dispositivos atados a passkeys
+    "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS credential_id TEXT",
+    "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS device_fingerprint VARCHAR(255)",
+    "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS country VARCHAR(10)",
+    "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS last_evaluated_at TIMESTAMP",
+    "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS strong_auth_at TIMESTAMP",
+    "ALTER TABLE devices ADD COLUMN IF NOT EXISTS credential_ids JSON",
     # Las passkeys de la v1 no tienen clave pública real: no se pueden verificar.
     f"DELETE FROM passkeys WHERE public_key = '{_MOCK_PUBLIC_KEY}'",
     # Usuarios activos sin ninguna passkey válida quedan pendientes de re-enrolamiento

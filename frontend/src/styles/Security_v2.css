@@ -241,3 +241,39 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- Diálogo de re-autenticación ---------- */
+.reauth-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 22, 40, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 1000;
+}
+
+.reauth-dialog {
+  background: #fff;
+  border-radius: 14px;
+  padding: 24px 26px;
+  max-width: 420px;
+  width: 100%;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+}
+
+.reauth-dialog h3 {
+  margin: 0 0 10px;
+  color: #333;
+}
+
+.reauth-dialog p {
+  margin: 0 0 10px;
+  color: #444;
+}
+
+/* ---------- Sesiones activas ---------- */
+.sessions-list .au-card.current {
+  border-left: 4px solid #667eea;
+}

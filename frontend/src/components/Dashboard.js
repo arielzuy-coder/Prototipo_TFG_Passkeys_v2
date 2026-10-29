@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api, { errorMessage } from '../services/api';
+import '../styles/Security_v2.css';
 
 function Dashboard({ user, onLogout }) {
   const navigate = useNavigate();
   const [passkeys, setPasskeys] = useState([]);
   const [auditEvents, setAuditEvents] = useState([]);
+  const [sessions, setSessions] = useState([]);
   const [stats, setStats] = useState(null);
   const [riskInfo, setRiskInfo] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -28,6 +30,13 @@ function Dashboard({ user, onLogout }) {
       setPasskeys(passkeysData.passkeys || []);
     } catch (error) {
       console.error('Error al cargar passkeys:', error);
+    }
+
+    try {
+      const { data: sessionsData } = await api.get('/me/sessions');
+      setSessions(sessionsData.sessions || []);
+    } catch (error) {
+      console.error('Error al cargar sesiones:', error);
     }
 
     try {
@@ -69,6 +78,16 @@ function Dashboard({ user, onLogout }) {
       await api.delete(`/passkeys/${passkeyId}`);
       alert('✅ Passkey revocada exitosamente');
       loadDashboardData();
+    } catch (error) {
+      alert(`❌ Error: ${errorMessage(error)}`);
+    }
+  };
+
+  const handleRevokeSession = async (sessionId) => {
+    if (!window.confirm('¿Cerrar esa sesión? El dispositivo tendrá que volver a iniciar sesión.')) return;
+    try {
+      await api.delete(`/me/sessions/${sessionId}`);
+      setSessions(sessions.filter((s) => s.id !== sessionId));
     } catch (error) {
       alert(`❌ Error: ${errorMessage(error)}`);
     }
@@ -240,6 +259,12 @@ function Dashboard({ user, onLogout }) {
         >
           📋 Historial de Acceso
         </button>
+        <button
+          className={`tab ${activeTab === 'sessions' ? 'active' : ''}`}
+          onClick={() => setActiveTab('sessions')}
+        >
+          💻 Sesiones activas ({sessions.length})
+        </button>
         {canAudit && (
           <button
             className={`tab ${activeTab === 'stats' ? 'active' : ''}`}
@@ -410,6 +435,34 @@ function Dashboard({ user, onLogout }) {
                 </div>
               </>
             )}
+          </div>
+        )}
+
+        {activeTab === 'sessions' && (
+          <div className="passkeys-section sessions-list">
+            <div className="section-header">
+              <h3>Sesiones activas</h3>
+              <p className="section-subtitle">
+                Cada sesión queda atada al navegador donde se inició y se reevalúa continuamente.
+              </p>
+            </div>
+            <div className="au-list">
+              {sessions.map((s) => (
+                <div key={s.id} className={`au-card ${s.current ? 'current' : ''}`}>
+                  <div className="au-card-header">
+                    <h4>{s.location || 'Ubicación desconocida'} <small>· IP {s.ip_address}</small></h4>
+                    {s.current && <span className="au-badge active">Esta sesión</span>}
+                  </div>
+                  <p className="au-ua">{s.user_agent}</p>
+                  <p className="au-meta">Iniciada {formatDate(s.created_at)} · vence {formatDate(s.expires_at)}</p>
+                  {!s.current && (
+                    <div className="au-actions">
+                      <button className="btn-danger" onClick={() => handleRevokeSession(s.id)}>Cerrar sesión</button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

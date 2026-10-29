@@ -47,6 +47,36 @@ class Settings(BaseSettings):
     # Risk Engine
     RISK_THRESHOLD_LOW: int = 40
     RISK_THRESHOLD_HIGH: int = 75
+    TRUSTED_COUNTRIES: str = "AR"  # países de bajo riesgo, separados por coma
+
+    # IP del cliente detrás de un proxy (Render, nginx, etc.)
+    # TRUSTED_PROXY_HOPS = cantidad de proxies propios delante de la app que agregan a X-Forwarded-For.
+    # 0 = usar la IP de la conexión. Nunca confiar en más saltos de los que existen: el cliente
+    # puede enviar su propio X-Forwarded-For.
+    TRUSTED_PROXY_HOPS: int = 0
+    # Alternativa: header con la IP real que el proxy SOBRESCRIBE siempre (ej. "true-client-ip")
+    CLIENT_IP_HEADER: Optional[str] = None
+
+    # Geolocalización: "ipapi" (ipapi.co, envía la IP a un tercero) o "none"
+    GEOIP_PROVIDER: str = "ipapi"
+    GEOIP_CACHE_SECONDS: int = 3600
+    # País asignado a IPs privadas/loopback. Vacío = ubicación desconocida (recomendado en producción)
+    LOCAL_IP_COUNTRY: Optional[str] = None
+
+    # Límite de intentos (rate limiting)
+    RATE_LIMIT_ENABLED: bool = True
+
+    # Re-autenticación para operaciones sensibles del administrador
+    REAUTH_MAX_AGE_MINUTES: int = 10
+
+    # Verificación continua de sesión (UC-03): intervalo de reevaluación según riesgo
+    SESSION_REEVAL_MINUTES_LOW: int = 30
+    SESSION_REEVAL_MINUTES_MEDIUM: int = 15
+    SESSION_REEVAL_MINUTES_HIGH: int = 5
+
+    @property
+    def trusted_countries(self) -> List[str]:
+        return [c.strip().upper() for c in self.TRUSTED_COUNTRIES.split(",") if c.strip()]
 
     @property
     def cors_origins(self) -> List[str]:

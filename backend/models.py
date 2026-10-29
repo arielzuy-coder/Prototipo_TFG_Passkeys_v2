@@ -57,6 +57,8 @@ class Device(Base):
     os = Column(String(50))
     browser = Column(String(50))
     trust_level = Column(Integer, default=50)
+    # Passkeys que ya se verificaron desde este dispositivo (H7: la huella sola no alcanza)
+    credential_ids = Column(JSON)
     last_seen_ip = Column(String(45))
     last_seen_location = Column(String(100))
     first_seen_at = Column(DateTime, default=datetime.utcnow)
@@ -79,6 +81,13 @@ class Session(Base):
     revoked = Column(Boolean, default=False)
     # Hash del jti del refresh token vigente (rotación obligatoria)
     refresh_jti_hash = Column(String(64))
+    # Verificación continua (UC-03): contexto con el que se abrió la sesión
+    credential_id = Column(Text)
+    device_fingerprint = Column(String(255))
+    country = Column(String(10))
+    last_evaluated_at = Column(DateTime)
+    # Última autenticación fuerte (login, step-up o re-autenticación con passkey)
+    strong_auth_at = Column(DateTime)
     
     user = relationship("User", back_populates="sessions")
 
@@ -167,3 +176,12 @@ class StepUpTransaction(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     expires_at = Column(DateTime, nullable=False)
     completed_at = Column(DateTime)
+
+
+class RateLimit(Base):
+    """Contador de ventana fija para limitar intentos (por IP, por cuenta, por operación)."""
+    __tablename__ = "rate_limits"
+
+    key = Column(String(200), primary_key=True)
+    window_start = Column(DateTime, nullable=False)
+    count = Column(Integer, nullable=False, default=0)

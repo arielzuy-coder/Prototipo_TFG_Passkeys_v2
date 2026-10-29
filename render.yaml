@@ -24,6 +24,10 @@ services:
       # Si no hay administradores, el log del primer arranque muestra el link de invitación
       - key: BOOTSTRAP_ADMIN_EMAIL
         value: changeme@empresa.com
+      # Render agrega la IP del cliente al final de X-Forwarded-For. Confirmar con
+      # GET /admin/diagnostics/client-ip después del primer despliegue y ajustar si hace falta.
+      - key: TRUSTED_PROXY_HOPS
+        value: "1"
     healthCheckPath: /health
     plan: free
 

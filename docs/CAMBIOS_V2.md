@@ -1,4 +1,4 @@
-# Cambios v2 — Fases 1 y 2
+# Cambios v2 — Fases 1, 2 y 3
 
 Correcciones de la revisión de seguridad (`docs/REVISION_SEGURIDAD.md`) manteniendo la lógica de la tesis:
 alta de usuarios por el administrador, máximo 5 passkeys por usuario, step-up por re-autenticación
@@ -83,7 +83,7 @@ de 15 minutos con refresh de 8 horas y rotación obligatoria.
 
 ## Verificación
 
-- `backend/tests/`: 38 tests con un autenticador FIDO2 por software que firma con claves reales.
+- `backend/tests/`: 56 tests con un autenticador FIDO2 por software que firma con claves reales.
   Cada ataque de la revisión tiene su test (firma alterada, challenge propio, replay, otro origen,
   invitación reutilizada, endpoints sin token, matriz de roles, reuso de refresh, bloqueo de step-up, etc.).
 
@@ -91,17 +91,75 @@ de 15 minutos con refresh de 8 horas y rotación obligatoria.
       TEST_DATABASE_URL=postgresql://postgres@localhost/auth_test pytest -q
 
 - `backend/tests/e2e_browser.py`: recorrido completo en Chromium con autenticador virtual (enrolamiento por
-  invitación, login, alta de usuario, step-up por passkey y por supervisor, recuperación).
+  invitación, login, re-autenticación del admin, alta de usuario, sesiones activas, step-up por passkey y
+  por supervisor, recuperación y revocación por token robado).
 
-## Pendiente (fase 3 y siguientes)
+## Fase 3: contexto, límites y verificación continua
 
-- **H9:** IP real detrás del proxy de Render (`X-Forwarded-For` con proxies de confianza); hoy el motor
-  puede ver una IP interna. Revisar también el envío de IPs a ipapi.co (minimización de datos).
-- **H11:** límite de intentos por IP y por cuenta en login. `/auth/login/failed` lo informa el cliente, así
-  que un tercero puede inflar el contador de otra cuenta (solo provoca step-up, no da acceso).
-- **H7:** dispositivo de confianza basado en la passkey usada en lugar del User-Agent.
-- Tesis, no implementado aún: aprobación dual para cambios críticos del administrador, step-up previo a
-  operaciones sensibles del admin, y la verificación continua de sesión (`session_reevaluation.py` existe
-  pero no está conectado a la aplicación).
-- Brecha con la tesis: la tesis describe Keycloak con OIDC/SAML (RF-05, RF-09); el prototipo es un backend
-  propio con JWT.
+### IP real del cliente (H9)
+
+- `client_ip()` (`services/common.py`) solo toma la IP de `X-Forwarded-For` contando `TRUSTED_PROXY_HOPS`
+  entradas desde la derecha (las que agregan proxies propios). Lo que el cliente ponga antes se ignora,
+  así que no puede falsificar su IP. Alternativa: `CLIENT_IP_HEADER`, para proxies que sobrescriben un header.
+- Render no filtra el `X-Forwarded-For` que manda el cliente y no documenta cuántos proxies hay delante,
+  por eso es configurable. **Después de desplegar, entrar como admin a `GET /admin/diagnostics/client-ip`:**
+  `resolved_client_ip` tiene que ser tu IP pública. Si aparece una IP interna (10.x), subir el valor.
+  Si el valor queda corto, el error es seguro: se ve una IP privada (ubicación desconocida, más step-up),
+  nunca una IP elegida por el cliente.
+- Las IPs privadas ya no se asumen de Argentina: quedan como ubicación desconocida.
+  `LOCAL_IP_COUNTRY=AR` lo habilita solo para desarrollo local.
+- Geolocalización en `risk/geo.py` con caché. `GEOIP_PROVIDER=none` evita enviar IPs a ipapi.co
+  (minimización de datos, RNF-N2). Los países de bajo riesgo se configuran con `TRUSTED_COUNTRIES`.
+
+### Límite de intentos (H11)
+
+- Contadores de ventana fija en PostgreSQL (`rate_limits`), válidos con varias instancias. Responden
+  429 con `Retry-After`. Por IP y por cuenta en login (10 intentos cada 5 min por cuenta), registro,
+  invitaciones, step-up, refresh y re-autenticación. Las claves se guardan hasheadas.
+- `/auth/login/failed` lo puede llamar cualquiera: ahora se registra como `auth_aborted` y **no** cuenta
+  para el motor de riesgo, que solo usa fallos verificados por el servidor (`auth_failed`, `stepup_failed`).
+- Corregido: las ventanas de "intentos fallidos en 1 hora" y "velocidad en 5 minutos" comparaban hora de
+  Buenos Aires con timestamps UTC, y en la práctica eran de 4 horas y de 3 h 05 min.
+
+### Dispositivo atado a la passkey (H7)
+
+- Cada dispositivo guarda las passkeys verificadas desde él (`devices.credential_ids`). Un dispositivo es
+  de confianza solo si coincide la huella **y** la passkey usada ya se verificó ahí. Copiar el
+  User-Agent de la víctima ya no alcanza.
+- El dispositivo queda verificado al enrolar, al superar un step-up o al re-autenticarse.
+
+### Verificación continua de sesión (UC-03 / RF-03)
+
+`auth/continuous.py`, en cada request autenticado y con contexto obtenido por el servidor:
+
+| Situación | Respuesta |
+|---|---|
+| El token se usa desde otro navegador (huella distinta) | Se revoca la sesión (posible robo de token). También aplica al refresh. |
+| La IP cambia de país | 403 `reauth_required`: confirmar con passkey |
+| La IP cambia dentro del mismo país | Se registra (`session_ip_changed`) y continúa |
+| Venció el intervalo (30 / 15 / 5 min según riesgo bajo / medio / alto) | Se reevalúan riesgo y políticas: `deny` revoca, `stepup` pide passkey |
+
+- Reemplaza a `session_reevaluation.py`, que no estaba conectado, dependía de `geopy` (no instalado) y
+  tomaba el contexto (IP, User-Agent) del propio cliente.
+- `POST /auth/reauth/begin|complete`: ceremonia WebAuthn dentro de la sesión. El frontend la dispara
+  sola: ante un `reauth_required` muestra el diálogo "Confirmá tu identidad" y reintenta la operación.
+
+### Operaciones sensibles del administrador (Tabla 4: "requiere step-up")
+
+- Toda operación del admin que modifica algo (usuarios, roles, recuperación, suspensión, políticas,
+  aprobación de step-up) exige una autenticación con passkey de los últimos 10 minutos
+  (`REAUTH_MAX_AGE_MINUTES`). Leer no la exige.
+
+### Sesiones propias (RF-05)
+
+- `GET /me/sessions` y `DELETE /me/sessions/{id}`; pestaña "Sesiones activas" en el panel del usuario.
+
+## Pendiente
+
+- Tesis, no implementado: **aprobación dual** para cambios críticos del administrador.
+  En un laboratorio con un solo admin bloquearía la operación; conviene definir qué cambios la exigen.
+- `threat_intelligence.py` sigue sin estar conectado a la aplicación.
+- Brecha con la tesis: la tesis describe Keycloak con OIDC/SAML (RF-05, RF-09); el prototipo es un
+  backend propio con JWT.
+- Endurecimiento del almacenamiento de tokens en el navegador (hoy `localStorage`): mover el refresh
+  token a una cookie `HttpOnly` reduce el impacto de un XSS.

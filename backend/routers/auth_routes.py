@@ -14,7 +14,9 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session as DBSession
 
-from auth.deps import CurrentUser, get_current_user
+from auth.continuous import check_device
+from auth.deps import CurrentUser, get_current_user, get_session_user
+from risk import geo
 from auth.session_manager import SessionManager
 from auth.token_manager import TokenManager, hash_token
 from auth.webauthn_handler import WebAuthnError, WebAuthnHandler
@@ -25,8 +27,9 @@ from risk.policies import PolicyEngine
 from risk.risk_engine import RiskEngine
 from services.common import (
     audit, client_ip, create_invitation, get_valid_invitation, normalize_email,
-    serialize_user, touch_device, user_agent,
+    serialize_user, touch_device, user_agent, device_fingerprint,
 )
+from services import ratelimit
 from services.mailer import send_otp_email
 
 logger = logging.getLogger(__name__)
@@ -84,28 +87,46 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
+class ReauthCompleteRequest(BaseModel):
+    credential: Dict[str, Any]
+
+
 # ============================================================================
 # Helpers
 # ============================================================================
+def _country(risk_assessment: Dict[str, Any]) -> Optional[str]:
+    loc = risk_assessment["context"].get("location", {})
+    return loc.get("country") if isinstance(loc, dict) else None
+
+
 def _location_display(risk_assessment: Dict[str, Any]) -> str:
     loc = risk_assessment["context"].get("location", {})
     return loc.get("display", "Unknown") if isinstance(loc, dict) else str(loc)
 
 
 def _issue_session(db: DBSession, request: Request, user: User, *, ip: str, ua: str, location: str,
-                   risk_score: float, decision: str, factors: Dict[str, Any], event_data: Dict[str, Any]) -> Dict:
+                   risk_score: float, decision: str, factors: Dict[str, Any], event_data: Dict[str, Any],
+                   credential_id: str, country: Optional[str], trust_device: bool) -> Dict:
     session = session_manager.create_session(
         user_id=user.id, ip_address=ip, user_agent=ua, location=location, risk_score=risk_score, db=db
     )
     tokens = token_manager.create_tokens(str(user.id), user.email, str(session.id), float(risk_score))
+    now = datetime.utcnow()
     session.refresh_jti_hash = hash_token(tokens.pop("refresh_jti"))
+    # Contexto de referencia para la verificación continua (UC-03)
+    session.credential_id = credential_id
+    session.device_fingerprint = device_fingerprint(ua)
+    session.country = country
+    session.last_evaluated_at = now
+    session.strong_auth_at = now
     db.add(RiskEvaluation(
         session_id=session.id, user_id=user.id, risk_score=risk_score, factors=factors, decision=decision
     ))
     audit(db, "auth_success", request, user_id=user.id, session_id=session.id,
           data={"risk_score": float(risk_score), "decision": decision, **event_data}, commit=False)
     db.commit()
-    touch_device(db, user, request, location)
+    # Tras un step-up superado, este dispositivo queda verificado con esta passkey (H7)
+    touch_device(db, user, request, location, create=trust_device, credential_id=credential_id)
     return tokens
 
 
@@ -158,7 +179,8 @@ def _otp_hash(tx: StepUpTransaction, code: str) -> str:
 # Enrolamiento por invitación (UC-01)
 # ============================================================================
 @router.get("/auth/invitations/{token}")
-def invitation_info(token: str, db: DBSession = Depends(get_db)):
+def invitation_info(token: str, request: Request, db: DBSession = Depends(get_db)):
+    ratelimit.by_ip(db, request, "invitation")
     inv = get_valid_invitation(db, token)
     if inv is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Invitación inválida, vencida o ya utilizada")
@@ -172,7 +194,8 @@ def invitation_info(token: str, db: DBSession = Depends(get_db)):
 
 
 @router.post("/auth/register/begin")
-def register_begin(data: InvitationRegisterBegin, db: DBSession = Depends(get_db)):
+def register_begin(request: Request, data: InvitationRegisterBegin, db: DBSession = Depends(get_db)):
+    ratelimit.by_ip(db, request, "register")
     inv = get_valid_invitation(db, data.invitation_token)
     if inv is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invitación inválida, vencida o ya utilizada")
@@ -184,6 +207,7 @@ def register_begin(data: InvitationRegisterBegin, db: DBSession = Depends(get_db
 
 @router.post("/auth/register/complete")
 def register_complete(request: Request, data: InvitationRegisterComplete, db: DBSession = Depends(get_db)):
+    ratelimit.by_ip(db, request, "register")
     inv = get_valid_invitation(db, data.invitation_token)
     if inv is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invitación inválida, vencida o ya utilizada")
@@ -224,7 +248,8 @@ def register_complete(request: Request, data: InvitationRegisterComplete, db: DB
 
     location = risk_engine._get_location_from_ip(client_ip(request))
     location = location.get("display") if isinstance(location, dict) else location
-    touch_device(db, user, request, location, device_name=data.device_name, create=True)
+    touch_device(db, user, request, location, device_name=data.device_name, create=True,
+                 credential_id=cred["credential_id"])
 
     return {"success": True, "message": "Passkey enrolada exitosamente", "credential_id": cred["credential_id"]}
 
@@ -240,7 +265,9 @@ def _active_user(db: DBSession, email: str) -> Optional[User]:
 
 
 @router.post("/auth/login/begin")
-def login_begin(data: LoginBeginRequest, db: DBSession = Depends(get_db)):
+def login_begin(request: Request, data: LoginBeginRequest, db: DBSession = Depends(get_db)):
+    ratelimit.by_ip(db, request, "login")
+    ratelimit.by_account(db, "login", data.email)
     user = _active_user(db, data.email)
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, _GENERIC_LOGIN_ERROR)
@@ -252,6 +279,8 @@ def login_begin(data: LoginBeginRequest, db: DBSession = Depends(get_db)):
 
 @router.post("/auth/login/complete")
 def login_complete(request: Request, data: LoginCompleteRequest, db: DBSession = Depends(get_db)):
+    ratelimit.by_ip(db, request, "login")
+    ratelimit.by_account(db, "login", data.email)
     user = _active_user(db, data.email)
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, _GENERIC_LOGIN_ERROR)
@@ -263,7 +292,8 @@ def login_complete(request: Request, data: LoginCompleteRequest, db: DBSession =
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, _GENERIC_LOGIN_ERROR)
 
     ip, ua = client_ip(request), user_agent(request)
-    risk = risk_engine.evaluate_risk(user=user, ip_address=ip, user_agent=ua, db=db)
+    risk = risk_engine.evaluate_risk(user=user, ip_address=ip, user_agent=ua, db=db,
+                                     credential_id=passkey.credential_id)
     decision = policy_engine.evaluate_policies(user=user, risk_score=risk["score"], context=risk["context"], db=db)
     score = float(risk["score"])
     factors = _jsonable_factors(risk["factors"])
@@ -297,7 +327,8 @@ def login_complete(request: Request, data: LoginCompleteRequest, db: DBSession =
                 "risk_score": adjusted_score,
                 "risk_level": adjusted_level,
                 "policy": decision["policy_name"],
-                "credential_id": passkey.credential_id[:16] + "...",
+                "credential_id": passkey.credential_id,
+                "country": _country(risk),
                 "factors": factors,
             },
         )
@@ -317,7 +348,8 @@ def login_complete(request: Request, data: LoginCompleteRequest, db: DBSession =
 
     tokens = _issue_session(db, request, user, ip=ip, ua=ua, location=location, risk_score=score,
                             decision=decision["action"], factors=factors,
-                            event_data={"credential_id": passkey.credential_id[:16] + "..."})
+                            event_data={"credential_id": passkey.credential_id[:16] + "..."},
+                            credential_id=passkey.credential_id, country=_country(risk), trust_device=False)
     return {
         "success": True,
         "requires_stepup": False,
@@ -329,10 +361,15 @@ def login_complete(request: Request, data: LoginCompleteRequest, db: DBSession =
 
 @router.post("/auth/login/failed")
 def login_failed(request: Request, data: LoginFailedRequest, db: DBSession = Depends(get_db)):
-    """El cliente informa que el usuario canceló o el autenticador falló (alimenta el factor 'intentos fallidos')."""
+    """
+    El cliente informa que el usuario canceló o el autenticador falló. Es informativo: cualquiera
+    puede llamar a este endpoint con cualquier email, así que NO alimenta el factor 'intentos
+    fallidos' del motor de riesgo (que solo cuenta fallos verificados por el servidor).
+    """
+    ratelimit.by_ip(db, request, "login_failed")
     user = db.query(User).filter(User.email == normalize_email(data.email)).first()
     if user:
-        audit(db, "auth_failed", request, user_id=user.id,
+        audit(db, "auth_aborted", request, user_id=user.id,
               data={"reason": data.reason, "error_message": data.error_message, "reported_by": "client"})
     return {"success": True}
 
@@ -341,7 +378,8 @@ def login_failed(request: Request, data: LoginFailedRequest, db: DBSession = Dep
 # Step-up (UC-04): re-autenticación con passkey, OTP por email o aprobación de supervisor
 # ============================================================================
 @router.post("/auth/stepup/passkey/begin")
-def stepup_passkey_begin(data: StepUpTokenRequest, db: DBSession = Depends(get_db)):
+def stepup_passkey_begin(request: Request, data: StepUpTokenRequest, db: DBSession = Depends(get_db)):
+    ratelimit.by_ip(db, request, "stepup")
     tx = _load_stepup(db, data.stepup_token)
     user = db.query(User).filter(User.id == tx.user_id).first()
     db.commit()  # libera el lock
@@ -350,6 +388,7 @@ def stepup_passkey_begin(data: StepUpTokenRequest, db: DBSession = Depends(get_d
 
 @router.post("/auth/stepup/otp/send")
 def stepup_otp_send(request: Request, data: StepUpTokenRequest, db: DBSession = Depends(get_db)):
+    ratelimit.by_ip(db, request, "stepup")
     if not settings.otp_enabled:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "El envío de OTP no está habilitado")
     tx = _load_stepup(db, data.stepup_token)
@@ -367,6 +406,7 @@ def stepup_otp_send(request: Request, data: StepUpTokenRequest, db: DBSession = 
 
 @router.post("/auth/stepup/supervisor/request")
 def stepup_supervisor_request(request: Request, data: StepUpTokenRequest, db: DBSession = Depends(get_db)):
+    ratelimit.by_ip(db, request, "stepup")
     tx = _load_stepup(db, data.stepup_token)
     if tx.status == "pending":
         tx.status = "approval_requested"
@@ -377,6 +417,8 @@ def stepup_supervisor_request(request: Request, data: StepUpTokenRequest, db: DB
 
 @router.post("/auth/stepup/verify")
 def stepup_verify(request: Request, data: StepUpVerifyRequest, db: DBSession = Depends(get_db)):
+    if data.verification_type != "supervisor":  # el sondeo de aprobación no consume cupo
+        ratelimit.by_ip(db, request, "stepup")
     tx = _load_stepup(db, data.stepup_token)
     user = db.query(User).filter(User.id == tx.user_id).first()
     if user is None or user.status != "active":
@@ -422,7 +464,9 @@ def stepup_verify(request: Request, data: StepUpVerifyRequest, db: DBSession = D
 
     tokens = _issue_session(db, request, user, ip=ctx["ip_address"], ua=ctx["user_agent"],
                             location=ctx.get("location"), risk_score=ctx["risk_score"], decision="stepup",
-                            factors=ctx.get("factors", {}), event_data={"stepup_method": method})
+                            factors=ctx.get("factors", {}), event_data={"stepup_method": method},
+                            credential_id=ctx.get("credential_id"), country=ctx.get("country"),
+                            trust_device=True)
     return {"success": True, "message": "Verificación adicional exitosa", "tokens": tokens,
             "user": serialize_user(user)}
 
@@ -432,6 +476,7 @@ def stepup_verify(request: Request, data: StepUpVerifyRequest, db: DBSession = D
 # ============================================================================
 @router.post("/auth/refresh")
 def refresh(request: Request, data: RefreshRequest, db: DBSession = Depends(get_db)):
+    ratelimit.by_ip(db, request, "refresh")
     claims = token_manager.verify_token(data.refresh_token, expected_type="refresh")
     if not claims or "jti" not in claims:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Refresh token inválido")
@@ -449,6 +494,8 @@ def refresh(request: Request, data: RefreshRequest, db: DBSession = Depends(get_
     user = db.query(User).filter(User.id == session.user_id).first()
     if user is None or user.status != "active":
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sesión inválida o revocada")
+    # Un refresh token robado no sirve desde otro navegador: se revoca la sesión
+    check_device(db, request, session)
 
     tokens = token_manager.create_tokens(str(user.id), user.email, str(session.id), float(session.risk_score or 0))
     session.refresh_jti_hash = hash_token(tokens.pop("refresh_jti"))
@@ -456,8 +503,44 @@ def refresh(request: Request, data: RefreshRequest, db: DBSession = Depends(get_
     return tokens
 
 
+@router.post("/auth/reauth/begin")
+def reauth_begin(current: CurrentUser = Depends(get_session_user), db: DBSession = Depends(get_db)):
+    """Re-autenticación con passkey para una sesión existente (verificación continua y operaciones sensibles)."""
+    ratelimit.by_account(db, "reauth", str(current.user.id))
+    return webauthn_handler.begin_authentication(db, current.user, purpose="reauth", ref_id=current.session.id)
+
+
+@router.post("/auth/reauth/complete")
+def reauth_complete(request: Request, data: ReauthCompleteRequest,
+                    current: CurrentUser = Depends(get_session_user), db: DBSession = Depends(get_db)):
+    ratelimit.by_account(db, "reauth", str(current.user.id))
+    user, session = current.user, current.session
+    try:
+        passkey = webauthn_handler.finish_authentication(db, user, data.credential, purpose="reauth",
+                                                         ref_id=session.id)
+    except WebAuthnError as e:
+        audit(db, "auth_failed", request, user_id=user.id, session_id=session.id,
+              data={"reason": "reauth_rejected", "detail": str(e)})
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "No se pudo verificar la passkey")
+
+    # El nuevo contexto pasa a ser la referencia de la sesión
+    now = datetime.utcnow()
+    ip = client_ip(request)
+    location = geo.lookup(ip)
+    session.ip_address = ip
+    session.location = location.get("display")
+    session.country = location.get("country")
+    session.strong_auth_at = now
+    session.last_evaluated_at = now
+    audit(db, "reauth_success", request, user_id=user.id, session_id=session.id, commit=False,
+          data={"credential_id": passkey.credential_id[:16] + "..."})
+    db.commit()
+    touch_device(db, user, request, session.location, credential_id=passkey.credential_id)
+    return {"success": True, "strong_auth_at": now.isoformat() + "Z"}
+
+
 @router.post("/auth/logout")
-def logout(request: Request, current: CurrentUser = Depends(get_current_user), db: DBSession = Depends(get_db)):
+def logout(request: Request, current: CurrentUser = Depends(get_session_user), db: DBSession = Depends(get_db)):
     current.session.revoked = True
     audit(db, "logout", request, user_id=current.user.id, session_id=current.session.id, commit=False)
     db.commit()

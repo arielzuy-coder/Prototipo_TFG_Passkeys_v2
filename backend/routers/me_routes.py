@@ -144,3 +144,49 @@ def my_events(limit: int = 50, current: CurrentUser = Depends(get_current_user),
             for e in events
         ],
     }
+
+
+# ============================================================================
+# Sesiones propias (RF-05: revocar tokens)
+# ============================================================================
+@router.get("/me/sessions")
+def my_sessions(current: CurrentUser = Depends(get_current_user), db: DBSession = Depends(get_db)):
+    from datetime import datetime
+    from models import Session as SessionModel
+    sessions = (
+        db.query(SessionModel)
+        .filter(SessionModel.user_id == current.user.id, SessionModel.revoked == False,  # noqa: E712
+                SessionModel.expires_at > datetime.utcnow())
+        .order_by(SessionModel.created_at.desc())
+        .all()
+    )
+    return {"sessions": [
+        {
+            "id": str(s.id),
+            "current": s.id == current.session.id,
+            "ip_address": s.ip_address,
+            "location": s.location,
+            "user_agent": s.user_agent,
+            "created_at": s.created_at.isoformat() + "Z",
+            "expires_at": s.expires_at.isoformat() + "Z",
+        }
+        for s in sessions
+    ]}
+
+
+@router.delete("/me/sessions/{session_id}")
+def revoke_my_session(session_id: str, request: Request,
+                      current: CurrentUser = Depends(get_current_user), db: DBSession = Depends(get_db)):
+    from models import Session as SessionModel
+    try:
+        sid = uuid.UUID(session_id)
+    except ValueError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Sesión no encontrada")
+    session = db.query(SessionModel).filter(SessionModel.id == sid, SessionModel.user_id == current.user.id).first()
+    if session is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Sesión no encontrada")
+    session.revoked = True
+    audit(db, "session_revoked", request, user_id=current.user.id, session_id=session.id, commit=False,
+          data={"reason": "user_request"})
+    db.commit()
+    return {"success": True}

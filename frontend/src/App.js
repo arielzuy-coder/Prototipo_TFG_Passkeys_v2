@@ -9,6 +9,7 @@ import Dashboard from './components/Dashboard';
 import AdminPanel from './components/AdminPanel';
 import RiskMonitor from './components/RiskMonitor';
 import AuditReports from './components/AuditReports';
+import ReauthPrompt from './components/ReauthPrompt';
 import api, { clearSession, saveSession } from './services/api';
 
 const hasRole = (user, ...roles) => !!user && roles.includes(user.role);
@@ -55,6 +56,7 @@ function App() {
   return (
     <Router>
       <div className="App">
+        {user && <ReauthPrompt />}
         <header className="app-header">
           <h1>🔐 Prototipo Autenticación Passkeys + Zero Trust</h1>
           <p className="subtitle">TFG - Universidad Siglo 21 | Zuy, Ariel Hernán</p>

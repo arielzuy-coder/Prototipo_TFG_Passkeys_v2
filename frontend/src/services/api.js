@@ -35,6 +35,13 @@ const isAuthEndpoint = (url = '') =>
 // Un solo refresh en curso aunque fallen varias requests a la vez
 let refreshPromise = null;
 
+// Re-autenticación (verificación continua / operaciones sensibles).
+// La app registra un handler que muestra el aviso y pide la passkey; devuelve una promesa
+// que se resuelve si el usuario confirmó su identidad.
+let reauthHandler = null;
+let reauthPromise = null;
+export const setReauthHandler = (fn) => { reauthHandler = fn; };
+
 const refreshTokens = async () => {
   const refreshToken = localStorage.getItem('refresh_token');
   if (!refreshToken) throw new Error('sin refresh token');
@@ -49,6 +56,20 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const original = error.config || {};
+    const detail = error.response?.data?.detail;
+
+    if (error.response?.status === 403 && detail?.code === 'reauth_required' && !original._reauth && reauthHandler) {
+      original._reauth = true;
+      try {
+        reauthPromise = reauthPromise || reauthHandler(detail);
+        await reauthPromise;
+        return api(original);
+      } catch (reauthError) {
+        return Promise.reject(reauthError);
+      } finally {
+        reauthPromise = null;
+      }
+    }
 
     if (error.response?.status === 401 && !original._retry && !isAuthEndpoint(original.url)) {
       original._retry = true;

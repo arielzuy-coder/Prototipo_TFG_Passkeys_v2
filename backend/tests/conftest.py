@@ -48,10 +48,10 @@ class RiskStub:
         self.action = "allow"
         self.score = 10.0
 
-    def evaluate_risk(self, user, ip_address, user_agent, db):
+    def evaluate_risk(self, user, ip_address, user_agent, db, credential_id=None):
         level = "low" if self.score < 40 else "medium" if self.score < 75 else "high"
         return {"score": self.score, "level": level, "factors": {},
-                "context": {"location": {"display": "Test"}, "user_id": user.id}}
+                "context": {"location": {"display": "Test", "country": "AR"}, "user_id": user.id}}
 
     def evaluate_policies(self, user, risk_score, context, db):
         return {"action": self.action, "policy_name": f"test_{self.action}"}
