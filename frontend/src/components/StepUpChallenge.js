@@ -1,279 +1,234 @@
-import React, { useState, useEffect } from 'react';
-import api from '../services/api';
+import React, { useEffect, useRef, useState } from 'react';
+import api, { errorMessage } from '../services/api';
+import { stepUpWithPasskey } from '../services/webauthn';
+import '../styles/Security_v2.css';
 
+const METHOD_LABELS = {
+  passkey: '👆 Passkey (biometría / PIN)',
+  otp: '📧 Código por email',
+  supervisor: '🧑‍💼 Aprobación de supervisor'
+};
+
+/**
+ * UC-04 Desafío adaptativo por riesgo (step-up).
+ * Métodos según la tesis: re-autenticación biométrica, OTP o aprobación manual por supervisor.
+ */
 function StepUpChallenge({ stepupData, onSuccess, onCancel }) {
-  const [verificationType, setVerificationType] = useState('otp');
+  const methods = stepupData.verification_methods || ['passkey'];
+  const token = stepupData.stepup_token;
+
+  const [method, setMethod] = useState(methods[0]);
   const [otpCode, setOtpCode] = useState('');
-  const [pin, setPin] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [waitingApproval, setWaitingApproval] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
-  const [timeLeft, setTimeLeft] = useState(900); // 15 minutos en segundos
+  const [timeLeft, setTimeLeft] = useState(() => {
+    const ms = new Date(stepupData.expires_at) - new Date();
+    return Number.isFinite(ms) ? Math.max(0, Math.floor(ms / 1000)) : 600;
+  });
+  const pollRef = useRef(null);
 
-  // Countdown timer
   useEffect(() => {
     if (timeLeft <= 0) {
-      setMessage({ type: 'error', text: 'El tiempo ha expirado. Por favor, inicia sesión nuevamente.' });
-      return;
+      setMessage({ type: 'error', text: 'El tiempo expiró. Iniciá sesión nuevamente.' });
+      return undefined;
     }
-
-    const timer = setInterval(() => {
-      setTimeLeft(prev => prev - 1);
-    }, 1000);
-
+    const timer = setInterval(() => setTimeLeft((t) => t - 1), 1000);
     return () => clearInterval(timer);
   }, [timeLeft]);
 
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  useEffect(() => () => clearInterval(pollRef.current), []);
+
+  const formatTime = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+
+  const finish = (data) => {
+    clearInterval(pollRef.current);
+    setMessage({ type: 'success', text: '✅ Verificación exitosa. Accediendo al sistema...' });
+    setTimeout(() => onSuccess(data.user, data.tokens), 1200);
   };
 
-  const handleVerify = async (e) => {
-    e.preventDefault();
+  const handlePasskey = async () => {
     setLoading(true);
     setMessage({ type: '', text: '' });
-
     try {
-      let verificationData = {};
-
-      if (verificationType === 'otp') {
-        if (!otpCode || otpCode.length !== 6) {
-          setMessage({ type: 'error', text: 'Por favor ingresa un código OTP de 6 dígitos' });
-          setLoading(false);
-          return;
-        }
-        verificationData = { otp: otpCode };
-      } else if (verificationType === 'pin') {
-        if (!pin || pin.length < 4) {
-          setMessage({ type: 'error', text: 'Por favor ingresa un PIN de al menos 4 dígitos' });
-          setLoading(false);
-          return;
-        }
-        verificationData = { pin: pin };
-      }
-
-      const { data } = await api.post('/auth/stepup/verify', {
-        stepup_token: stepupData.stepup_token,
-        verification_type: verificationType,
-        verification_data: verificationData
-      });
-
-      if (data.success) {
-        setMessage({ type: 'success', text: '✅ Verificación exitosa. Accediendo al sistema...' });
-        setTimeout(() => {
-          onSuccess(data.user, data.tokens);
-        }, 1500);
-      }
-
+      finish(await stepUpWithPasskey(token));
     } catch (error) {
-      console.error('Error en step-up:', error);
-      setMessage({ 
-        type: 'error', 
-        text: error.response?.data?.detail || 'Error en la verificación. Intenta nuevamente.' 
-      });
+      setMessage({ type: 'error', text: errorMessage(error, 'Verificación fallida') });
     } finally {
       setLoading(false);
     }
   };
 
-  const riskScore = stepupData.risk_assessment?.score || 0;
-  const riskLevel = stepupData.risk_assessment?.level || 'medium';
-
-  // Determinar el mensaje contextual según los factores de riesgo
-  const getContextualMessage = () => {
-    const factors = stepupData.risk_assessment?.factors;
-    
-    if (!factors) {
-      return "Por tu seguridad, necesitamos que completes una verificación adicional.";
+  const handleSendOtp = async () => {
+    setLoading(true);
+    setMessage({ type: '', text: '' });
+    try {
+      await api.post('/auth/stepup/otp/send', { stepup_token: token });
+      setOtpSent(true);
+      setMessage({ type: 'info', text: 'Te enviamos un código de 6 dígitos a tu email registrado.' });
+    } catch (error) {
+      setMessage({ type: 'error', text: errorMessage(error, 'No se pudo enviar el código') });
+    } finally {
+      setLoading(false);
     }
-
-    // Prioridad 1: Nueva ubicación/país
-    if (factors.location && !factors.location.known) {
-      const locationMsg = factors.location.message || '';
-      if (locationMsg.includes('Nueva ubicación')) {
-        return "Hemos detectado un acceso desde una ubicación diferente a la habitual. Por tu seguridad, necesitamos verificar tu identidad.";
-      }
-    }
-
-    // Prioridad 2: Dispositivo desconocido
-    if (factors.device && !factors.device.known) {
-      return "Hemos detectado un nuevo dispositivo intentando acceder a tu cuenta. Por tu seguridad, necesitamos verificar tu identidad.";
-    }
-
-    // Prioridad 3: Intentos fallidos recientes
-    if (factors.failed_attempts && factors.failed_attempts.count > 0) {
-      return "Detectamos intentos de acceso fallidos recientes. Por precaución, necesitamos verificar tu identidad.";
-    }
-
-    // Prioridad 4: Horario inusual
-    if (factors.time && !factors.time.is_business_hours && riskScore < 40) {
-      return "Detectamos un acceso fuera del horario habitual. Por tu seguridad, necesitamos verificar tu identidad.";
-    }
-
-    // Prioridad 5: Riesgo alto
-    if (riskLevel === 'high' || riskScore >= 75) {
-      return "Hemos detectado condiciones de riesgo elevado en tu intento de acceso. Por tu seguridad, necesitamos verificar tu identidad.";
-    }
-
-    // Prioridad 6: Riesgo medio
-    if (riskLevel === 'medium' || riskScore >= 40) {
-      return "Detectamos algunas condiciones inusuales en tu intento de acceso. Por precaución, necesitamos verificar tu identidad.";
-    }
-
-    // Default
-    return "Por tu seguridad, necesitamos que completes una verificación adicional.";
   };
+
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    if (otpCode.length !== 6) {
+      setMessage({ type: 'error', text: 'Ingresá el código de 6 dígitos' });
+      return;
+    }
+    setLoading(true);
+    try {
+      const { data } = await api.post('/auth/stepup/verify', {
+        stepup_token: token, verification_type: 'otp', otp: otpCode
+      });
+      finish(data);
+    } catch (error) {
+      setMessage({ type: 'error', text: errorMessage(error, 'Código incorrecto') });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const pollApproval = async () => {
+    try {
+      const res = await api.post('/auth/stepup/verify', { stepup_token: token, verification_type: 'supervisor' });
+      if (res.status === 200) finish(res.data);
+    } catch (error) {
+      clearInterval(pollRef.current);
+      setWaitingApproval(false);
+      setMessage({ type: 'error', text: 'La solicitud fue rechazada o venció. Iniciá sesión nuevamente.' });
+    }
+  };
+
+  const handleRequestApproval = async () => {
+    setLoading(true);
+    setMessage({ type: '', text: '' });
+    try {
+      await api.post('/auth/stepup/supervisor/request', { stepup_token: token });
+      setWaitingApproval(true);
+      setMessage({ type: 'info', text: 'Solicitud enviada. Esperando que un supervisor la apruebe...' });
+      pollRef.current = setInterval(pollApproval, 4000);
+    } catch (error) {
+      setMessage({ type: 'error', text: errorMessage(error, 'No se pudo enviar la solicitud') });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const riskScore = stepupData.risk_assessment?.score ?? 0;
+  const riskLevel = stepupData.risk_assessment?.level || 'medium';
+  const factors = stepupData.risk_assessment?.factors || {};
+  const expired = timeLeft <= 0;
 
   return (
     <div className="stepup-container">
       <div className="stepup-card">
         <div className="stepup-header">
-          <h2>🔐 Verificación Adicional Requerida</h2>
+          <h2>🔐 Verificación adicional requerida</h2>
           <div className={`risk-badge risk-${riskLevel}`}>
-            Nivel de Riesgo: {riskLevel.toUpperCase()} ({riskScore}/100)
+            Nivel de riesgo: {riskLevel.toUpperCase()} ({riskScore}/100)
           </div>
         </div>
 
         <div className="stepup-info">
-          <p>
-            {getContextualMessage()}
-          </p>
-
-          {stepupData.risk_assessment?.factors && (
+          <p>Detectamos condiciones inusuales en este acceso. Por tu seguridad, confirmá tu identidad.</p>
+          {Object.keys(factors).length > 0 && (
             <div className="risk-factors">
               <h4>Factores detectados:</h4>
               <ul>
-                {Object.entries(stepupData.risk_assessment.factors).map(([key, value]) => (
-                  <li key={key}>
-                    {value.message || `${key}: ${value.value}`}
-                  </li>
+                {Object.entries(factors).map(([key, value]) => (
+                  <li key={key}>{value?.message || key}</li>
                 ))}
               </ul>
             </div>
           )}
         </div>
 
-        <div className="timer-display">
-          ⏱️ Tiempo restante: <strong>{formatTime(timeLeft)}</strong>
-        </div>
+        <div className="timer-display">⏱️ Tiempo restante: <strong>{formatTime(Math.max(0, timeLeft))}</strong></div>
 
-        <form onSubmit={handleVerify} className="stepup-form">
+        {methods.length > 1 && (
           <div className="verification-method-selector">
-            <label>Selecciona el método de verificación:</label>
+            <label>Método de verificación:</label>
             <div className="method-buttons">
-              <button
-                type="button"
-                className={`method-btn ${verificationType === 'otp' ? 'active' : ''}`}
-                onClick={() => setVerificationType('otp')}
-              >
-                📱 Código OTP
-              </button>
-              <button
-                type="button"
-                className={`method-btn ${verificationType === 'pin' ? 'active' : ''}`}
-                onClick={() => setVerificationType('pin')}
-              >
-                🔢 PIN
-              </button>
-              <button
-                type="button"
-                className={`method-btn ${verificationType === 'biometric' ? 'active' : ''}`}
-                onClick={() => setVerificationType('biometric')}
-              >
-                👆 Biometría
-              </button>
+              {methods.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  className={`method-btn ${method === m ? 'active' : ''}`}
+                  onClick={() => { setMethod(m); setMessage({ type: '', text: '' }); }}
+                  disabled={loading || waitingApproval}
+                >
+                  {METHOD_LABELS[m] || m}
+                </button>
+              ))}
             </div>
           </div>
+        )}
 
-          {verificationType === 'otp' && (
-            <div className="verification-input">
-              <label htmlFor="otp">Código OTP (6 dígitos)</label>
-              <div className="otp-hint">
-                💡 Código generado: <strong>{stepupData.otp_code}</strong>
-                <br />
-                <small>(En producción, este código se enviaría por email/SMS)</small>
-              </div>
-              <input
-                type="text"
-                id="otp"
-                value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                placeholder="123456"
-                maxLength="6"
-                autoFocus
-                disabled={loading}
-              />
-            </div>
-          )}
-
-          {verificationType === 'pin' && (
-            <div className="verification-input">
-              <label htmlFor="pin">PIN de Seguridad</label>
-              <small>Ingresa tu PIN personal de 4-6 dígitos</small>
-              <input
-                type="password"
-                id="pin"
-                value={pin}
-                onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                placeholder="••••"
-                maxLength="6"
-                autoFocus
-                disabled={loading}
-              />
-            </div>
-          )}
-
-          {verificationType === 'biometric' && (
+        <div className="stepup-form">
+          {method === 'passkey' && (
             <div className="verification-input biometric-info">
-              <p>
-                👆 La verificación biométrica adicional utiliza el mismo dispositivo
-                de autenticación (huella, Face ID, etc.)
-              </p>
-              <p>
-                <strong>Nota:</strong> En este prototipo, la biometría se acepta automáticamente
-                ya que WebAuthn ya validó tu identidad en el paso anterior.
-              </p>
+              <p>Volvé a confirmar con tu passkey (huella, rostro o PIN del dispositivo).</p>
+              <button type="button" className="btn-primary" onClick={handlePasskey} disabled={loading || expired}>
+                {loading ? 'Verificando...' : '👆 Verificar con Passkey'}
+              </button>
             </div>
           )}
 
-          {message.text && (
-            <div className={`message ${message.type}`}>
-              {message.text}
+          {method === 'otp' && (
+            <form onSubmit={handleVerifyOtp} className="verification-input">
+              {!otpSent ? (
+                <button type="button" className="btn-primary" onClick={handleSendOtp} disabled={loading || expired}>
+                  📧 Enviar código a mi email
+                </button>
+              ) : (
+                <>
+                  <label htmlFor="otp">Código (6 dígitos)</label>
+                  <input
+                    type="text"
+                    id="otp"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="123456"
+                    maxLength="6"
+                    autoFocus
+                    disabled={loading}
+                  />
+                  <button type="submit" className="btn-primary" disabled={loading || expired}>✓ Verificar código</button>
+                </>
+              )}
+            </form>
+          )}
+
+          {method === 'supervisor' && (
+            <div className="verification-input">
+              <p>Un administrador revisa el contexto del acceso y lo aprueba o rechaza.</p>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={handleRequestApproval}
+                disabled={loading || waitingApproval || expired}
+              >
+                {waitingApproval ? '⏳ Esperando aprobación...' : '🧑‍💼 Solicitar aprobación'}
+              </button>
             </div>
           )}
+
+          {message.text && <div className={`message ${message.type}`}>{message.text}</div>}
 
           <div className="stepup-actions">
-            <button 
-              type="submit" 
-              className="btn-primary" 
-              disabled={loading || timeLeft <= 0}
-            >
-              {loading ? (
-                <>
-                  <span className="spinner-small"></span>
-                  Verificando...
-                </>
-              ) : (
-                '✓ Verificar Identidad'
-              )}
-            </button>
-
-            <button 
-              type="button" 
-              className="btn-secondary" 
-              onClick={onCancel}
-              disabled={loading}
-            >
-              ✕ Cancelar
-            </button>
+            <button type="button" className="btn-secondary" onClick={onCancel} disabled={loading}>✕ Cancelar</button>
           </div>
-        </form>
+        </div>
 
         <div className="stepup-footer">
-          <p className="security-note">
-            🔒 Esta verificación adicional protege tu cuenta contra accesos no autorizados.
-          </p>
+          <p className="security-note">🔒 Esta verificación protege tu cuenta contra accesos no autorizados.</p>
         </div>
       </div>
     </div>

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../services/api';
+import api, { errorMessage } from '../services/api';
 import AuditReports from './AuditReports';
+import AdminUsers from './AdminUsers';
 
-function AdminPanel() {
+function AdminPanel({ user }) {
   const [policies, setPolicies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState({ type: '', text: '' });
@@ -137,7 +138,7 @@ function AdminPanel() {
       console.error('Error saving policy:', error);
       setMessage({ 
         type: 'error', 
-        text: error.response?.data?.detail || 'Error al guardar política' 
+        text: errorMessage(error, 'Error al guardar política') 
       });
     } finally {
       setLoading(false);
@@ -157,7 +158,7 @@ function AdminPanel() {
       console.error('Error deleting policy:', error);
       setMessage({ 
         type: 'error', 
-        text: error.response?.data?.detail || 'Error al eliminar política' 
+        text: errorMessage(error, 'Error al eliminar política') 
       });
     }
   };
@@ -174,7 +175,7 @@ function AdminPanel() {
       console.error('Error toggling policy:', error);
       setMessage({ 
         type: 'error', 
-        text: error.response?.data?.detail || 'Error al cambiar estado' 
+        text: errorMessage(error, 'Error al cambiar estado') 
       });
     }
   };
@@ -365,6 +366,12 @@ function AdminPanel() {
           >
             <span>🔒</span> Políticas de Acceso
           </button>
+          <button
+            className={`tab-button ${activeTab === 'users' ? 'active' : ''}`}
+            onClick={() => setActiveTab('users')}
+          >
+            <span>👥</span> Usuarios y Aprobaciones
+          </button>
           <button 
             className={`tab-button ${activeTab === 'audit' ? 'active' : ''}`}
             onClick={() => setActiveTab('audit')}
@@ -518,6 +525,8 @@ function AdminPanel() {
               </button>
             </div>
           </div>
+        ) : activeTab === 'users' ? (
+          <AdminUsers currentUser={user} />
         ) : (
           // Tab de Auditoría y Reportes
           <AuditReports />

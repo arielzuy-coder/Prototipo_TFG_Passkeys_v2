@@ -8,6 +8,10 @@ import LoginPasswordless from './components/LoginPasswordless';
 import Dashboard from './components/Dashboard';
 import AdminPanel from './components/AdminPanel';
 import RiskMonitor from './components/RiskMonitor';
+import AuditReports from './components/AuditReports';
+import api, { clearSession, saveSession } from './services/api';
+
+const hasRole = (user, ...roles) => !!user && roles.includes(user.role);
 
 function App() {
   const [user, setUser] = useState(null);
@@ -25,17 +29,18 @@ function App() {
   }, []);
 
   const handleLogin = (userData, tokens) => {
+    saveSession(userData, tokens);
     setUser(userData);
-    localStorage.setItem('user', JSON.stringify(userData));
-    localStorage.setItem('access_token', tokens.access_token);
-    localStorage.setItem('refresh_token', tokens.refresh_token);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await api.post('/auth/logout');  // revoca la sesión en el servidor
+    } catch (e) {
+      // aunque falle, se limpia la sesión local
+    }
+    clearSession();
     setUser(null);
-    localStorage.removeItem('user');
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
   };
 
   if (loading) {
@@ -59,7 +64,7 @@ function App() {
           <Routes>
             <Route 
               path="/enroll" 
-              element={<EnrollPasskey />} 
+              element={<EnrollPasskey user={user} />} 
             />
             
             <Route 
@@ -83,19 +88,28 @@ function App() {
             <Route 
               path="/admin" 
               element={
-                user ? 
-                  <AdminPanel /> : 
-                  <Navigate to="/login" replace />
+                hasRole(user, 'admin') ?
+                  <AdminPanel user={user} /> :
+                  <Navigate to={user ? '/dashboard' : '/login'} replace />
               } 
             />
 
             <Route 
               path="/risk" 
               element={
-                user ? 
-                  <RiskMonitor user={user} /> : 
-                  <Navigate to="/login" replace />
+                hasRole(user, 'admin', 'auditor') ?
+                  <RiskMonitor user={user} /> :
+                  <Navigate to={user ? '/dashboard' : '/login'} replace />
               } 
+            />
+
+            <Route
+              path="/audit"
+              element={
+                hasRole(user, 'admin', 'auditor') ?
+                  <div className="admin-panel"><AuditReports /></div> :
+                  <Navigate to={user ? '/dashboard' : '/login'} replace />
+              }
             />
             
             <Route 

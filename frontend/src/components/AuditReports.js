@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/AuditReports.css';
+import api from '../services/api';
 
 const AuditReports = () => {
   const [reportData, setReportData] = useState(null);
@@ -24,14 +25,8 @@ const AuditReports = () => {
   
   const loadStats = async () => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/audit/statistics/summary?days=30`, {
-        credentials: 'include'
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setStats(data);
-      }
+      const { data } = await api.get('/api/audit/statistics/summary', { params: { days: 30 } });
+      setStats(data);
     } catch (err) {
       console.error('Error cargando estadísticas:', err);
     }
@@ -42,25 +37,12 @@ const AuditReports = () => {
     setError(null);
     
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/audit/reports/aggregated`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          start_date: filters.start_date || null,
-          end_date: filters.end_date || null,
-          event_types: filters.event_types.length > 0 ? filters.event_types : null,
-          limit: filters.limit
-        })
+      const { data } = await api.post('/api/audit/reports/aggregated', {
+        start_date: filters.start_date || null,
+        end_date: filters.end_date || null,
+        event_types: filters.event_types.length > 0 ? filters.event_types : null,
+        limit: filters.limit
       });
-      
-      if (!response.ok) {
-        throw new Error('Error al generar reporte');
-      }
-      
-      const data = await response.json();
       setReportData(data);
     } catch (err) {
       setError(err.message);
@@ -84,21 +66,7 @@ const AuditReports = () => {
         }
       };
       
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/audit/export`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(exportRequest)
-      });
-      
-      if (!response.ok) {
-        throw new Error('Error al exportar datos');
-      }
-      
-      // Descargar el archivo
-      const blob = await response.blob();
+      const { data: blob } = await api.post('/api/audit/export', exportRequest, { responseType: 'blob' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

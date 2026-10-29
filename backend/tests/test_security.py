@@ -386,3 +386,17 @@ def test_H8_cors_rejects_foreign_onrender_origin(client):
     good = client.options("/auth/login/begin", headers={
         "Origin": ORIGIN, "Access-Control-Request-Method": "POST"})
     assert good.headers.get("access-control-allow-origin") == ORIGIN
+
+
+# ============================================================================
+# H7: dispositivos por usuario
+# ============================================================================
+def test_H7_same_browser_two_users_each_get_their_device(client, monkeypatch):
+    from database import SessionLocal
+    from models import Device
+    enroll(client, new_invitation("ana@empresa.com"))
+    enroll(client, new_invitation("bruno@empresa.com"))  # mismo User-Agent del TestClient
+    db = SessionLocal()
+    owners = {d.user_id for d in db.query(Device).all()}
+    db.close()
+    assert len(owners) == 2

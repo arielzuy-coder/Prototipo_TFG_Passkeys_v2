@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { startAuthentication } from '@simplewebauthn/browser';
-import api from '../services/api';
+import api, { errorMessage } from '../services/api';
+import { getAssertion } from '../services/webauthn';
 import RiskIndicator from './RiskIndicator';
 import StepUpChallenge from './StepUpChallenge';
 
@@ -33,23 +33,15 @@ function LoginPasswordless({ onLogin }) {
 
       let asseResp;
       try {
-        asseResp = await startAuthentication(options);
+        asseResp = await getAssertion(options);
       } catch (error) {
-        // Notificar al backend sobre el fallo de autenticación
-        try {
-          await api.post('/auth/login/failed', { 
-            email,
-            reason: error.name === 'NotAllowedError' ? 'user_cancelled' : 'authentication_error',
-            error_message: error.message
-          });
-        } catch (notifyError) {
-          console.error('Error al notificar fallo:', notifyError);
-        }
-        
-        if (error.name === 'NotAllowedError') {
-          throw new Error('Operación cancelada por el usuario');
-        }
-        throw new Error('Error en la autenticación biométrica');
+        // Informar al backend el fallo (alimenta el factor 'intentos fallidos' del motor de riesgo)
+        api.post('/auth/login/failed', {
+          email,
+          reason: error.name === 'NotAllowedError' ? 'user_cancelled' : 'authentication_error',
+          error_message: String(error.message || '').slice(0, 300)
+        }).catch(() => {});
+        throw error.browserError || error;
       }
 
       const { data: result } = await api.post('/auth/login/complete', {
@@ -96,10 +88,7 @@ function LoginPasswordless({ onLogin }) {
           });
         }
       } else {
-        setMessage({ 
-          type: 'error', 
-          text: error.response?.data?.detail || error.message || 'Error al iniciar sesión'
-        });
+        setMessage({ type: 'error', text: errorMessage(error, 'Error al iniciar sesión') });
       }
     } finally {
       setLoading(false);
@@ -190,7 +179,7 @@ function LoginPasswordless({ onLogin }) {
             className="link-button"
             disabled={loading}
           >
-            ¿Primera vez? Enrolar Passkey →
+            ¿Primera vez? Usá el link de invitación →
           </button>
         </div>
 

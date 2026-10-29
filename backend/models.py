@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Boolean, DateTime, Text, ForeignKey, DECIMAL, JSON
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, Text, ForeignKey, DECIMAL, JSON, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -46,10 +46,13 @@ class Passkey(Base):
 
 class Device(Base):
     __tablename__ = "devices"
+    # La huella es única por usuario (antes era global: un mismo navegador
+    # usado por dos personas dejaba a la segunda sin dispositivo registrado)
+    __table_args__ = (UniqueConstraint('user_id', 'device_fingerprint', name='uq_devices_user_fingerprint'),)
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
-    device_fingerprint = Column(String(255), unique=True, nullable=False)
+    device_fingerprint = Column(String(255), nullable=False, index=True)
     device_name = Column(String(100))
     os = Column(String(50))
     browser = Column(String(50))

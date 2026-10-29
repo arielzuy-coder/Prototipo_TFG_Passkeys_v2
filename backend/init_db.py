@@ -20,6 +20,9 @@ MIGRATIONS = [
     "ALTER TABLE sessions ADD COLUMN IF NOT EXISTS refresh_jti_hash VARCHAR(64)",
     "ALTER TABLE passkeys ADD COLUMN IF NOT EXISTS backed_up BOOLEAN DEFAULT FALSE",
     "ALTER TABLE passkeys ADD COLUMN IF NOT EXISTS transports JSON",
+    # Huella de dispositivo única por usuario, no global
+    "ALTER TABLE devices DROP CONSTRAINT IF EXISTS devices_device_fingerprint_key",
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_devices_user_fingerprint ON devices (user_id, device_fingerprint)",
     # Las passkeys de la v1 no tienen clave pública real: no se pueden verificar.
     f"DELETE FROM passkeys WHERE public_key = '{_MOCK_PUBLIC_KEY}'",
     # Usuarios activos sin ninguna passkey válida quedan pendientes de re-enrolamiento

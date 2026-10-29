@@ -1,126 +1,69 @@
+import { startAuthentication, startRegistration } from '@simplewebauthn/browser';
 import api from './api';
 
-export const enrollPasskey = async (email, deviceName) => {
+// Traduce los errores del navegador a mensajes claros
+const browserError = (error) => {
+  if (error?.name === 'NotAllowedError') return new Error('Operación cancelada o tiempo agotado');
+  if (error?.name === 'InvalidStateError') return new Error('Este autenticador ya está registrado');
+  if (error?.name === 'SecurityError') return new Error('El dominio no coincide con el configurado (RP ID)');
+  return new Error('El autenticador no pudo completar la operación');
+};
+
+const createCredential = async (options) => {
   try {
-    const { data: options } = await api.post('/auth/register/begin', { email });
-    
-    const { startRegistration } = await import('@simplewebauthn/browser');
-    
-    const attResp = await startRegistration(options);
-    
-    const { data: result } = await api.post('/auth/register/complete', {
-      email,
-      credential: attResp,
-      device_name: deviceName
-    });
-    
-    return {
-      success: true,
-      data: result
-    };
-    
+    return await startRegistration(options);
   } catch (error) {
-    console.error('Error en enrollPasskey:', error);
-    return {
-      success: false,
-      message: error.response?.data?.detail || error.message || 'Error al enrolar Passkey'
-    };
+    throw browserError(error);
   }
 };
 
-export const authenticateWithPasskey = async (email) => {
+export const getAssertion = async (options) => {
   try {
-    const { data: options } = await api.post('/auth/login/begin', { email });
-    
-    const { startAuthentication } = await import('@simplewebauthn/browser');
-    
-    const asseResp = await startAuthentication(options);
-    
-    const { data: result } = await api.post('/auth/login/complete', {
-      email,
-      credential: asseResp
-    });
-    
-    return {
-      success: true,
-      data: result
-    };
-    
+    return await startAuthentication(options);
   } catch (error) {
-    console.error('Error en authenticateWithPasskey:', error);
-    return {
-      success: false,
-      message: error.response?.data?.detail || error.message || 'Error al autenticar',
-      riskAssessment: error.response?.data?.detail?.risk_assessment
-    };
+    error.browserError = browserError(error);
+    throw error;
   }
 };
 
-export const listPasskeys = async (email) => {
-  try {
-    const { data } = await api.get(`/passkeys/${email}`);
-    
-    return {
-      success: true,
-      data: data.passkeys
-    };
-    
-  } catch (error) {
-    console.error('Error en listPasskeys:', error);
-    return {
-      success: false,
-      message: error.response?.data?.detail || error.message || 'Error al listar Passkeys'
-    };
-  }
+// Primera passkey, con la invitación de alta o de recuperación
+export const enrollWithInvitation = async (invitationToken, deviceName) => {
+  const { data: options } = await api.post('/auth/register/begin', { invitation_token: invitationToken });
+  const credential = await createCredential(options);
+  const { data } = await api.post('/auth/register/complete', {
+    invitation_token: invitationToken,
+    credential,
+    device_name: deviceName
+  });
+  return data;
 };
 
-export const revokePasskey = async (passkeyId) => {
-  try {
-    await api.delete(`/passkeys/${passkeyId}`);
-    
-    return {
-      success: true,
-      message: 'Passkey revocada exitosamente'
-    };
-    
-  } catch (error) {
-    console.error('Error en revokePasskey:', error);
-    return {
-      success: false,
-      message: error.response?.data?.detail || error.message || 'Error al revocar Passkey'
-    };
-  }
+// Passkey adicional para un usuario con sesión iniciada (máx. 5)
+export const addPasskey = async (deviceName) => {
+  const { data: options } = await api.post('/passkeys/register/begin');
+  const credential = await createCredential(options);
+  const { data } = await api.post('/passkeys/register/complete', { credential, device_name: deviceName });
+  return data;
 };
 
-export const checkWebAuthnSupport = () => {
-  if (!window.PublicKeyCredential) {
-    return {
-      supported: false,
-      message: 'WebAuthn no está soportado en este navegador'
-    };
+// Re-autenticación para el step-up
+export const stepUpWithPasskey = async (stepupToken) => {
+  const { data: options } = await api.post('/auth/stepup/passkey/begin', { stepup_token: stepupToken });
+  let credential;
+  try {
+    credential = await startAuthentication(options);
+  } catch (error) {
+    throw browserError(error);
   }
-  
-  return {
-    supported: true,
-    message: 'WebAuthn está soportado'
-  };
+  const { data } = await api.post('/auth/stepup/verify', {
+    stepup_token: stepupToken,
+    verification_type: 'passkey',
+    credential
+  });
+  return data;
 };
 
-export const checkPlatformAuthenticatorAvailable = async () => {
-  try {
-    const available = await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-    
-    return {
-      available,
-      message: available 
-        ? 'Autenticador de plataforma disponible (biometría/PIN)' 
-        : 'No hay autenticador de plataforma disponible'
-    };
-    
-  } catch (error) {
-    return {
-      available: false,
-      message: 'Error al verificar autenticador de plataforma'
-    };
-  }
-};
+export const checkWebAuthnSupport = () => ({
+  supported: !!window.PublicKeyCredential,
+  message: window.PublicKeyCredential ? 'WebAuthn está soportado' : 'WebAuthn no está soportado en este navegador'
+});

@@ -1,144 +1,143 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { startRegistration } from '@simplewebauthn/browser';
-import api from '../services/api';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import api, { errorMessage } from '../services/api';
+import { addPasskey, enrollWithInvitation } from '../services/webauthn';
 
-function EnrollPasskey() {
-  const [email, setEmail] = useState('');
+/**
+ * UC-01 Enrolar Passkey. Dos modos:
+ *  - con invitación (?invite=...): alta o recuperación, sin sesión iniciada;
+ *  - con sesión iniciada: agregar una passkey adicional (máx. 5).
+ */
+function EnrollPasskey({ user }) {
+  const [params] = useSearchParams();
+  const inviteToken = params.get('invite');
+  const mode = inviteToken ? 'invite' : user ? 'add' : 'none';
+
+  const [invitation, setInvitation] = useState(null);
   const [deviceName, setDeviceName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(mode === 'invite');
   const [message, setMessage] = useState({ type: '', text: '' });
   const navigate = useNavigate();
 
+  useEffect(() => {
+    if (mode !== 'invite') return;
+    api.get(`/auth/invitations/${encodeURIComponent(inviteToken)}`)
+      .then(({ data }) => setInvitation(data))
+      .catch((error) => setMessage({ type: 'error', text: errorMessage(error, 'Invitación inválida') }))
+      .finally(() => setChecking(false));
+  }, [mode, inviteToken]);
+
   const handleEnroll = async (e) => {
     e.preventDefault();
-    
-    if (!email || !deviceName) {
-      setMessage({ type: 'error', text: 'Por favor completa todos los campos' });
+    if (!deviceName.trim()) {
+      setMessage({ type: 'error', text: 'Poné un nombre para identificar este dispositivo' });
       return;
     }
-
     setLoading(true);
     setMessage({ type: '', text: '' });
-
     try {
-      const { data: options } = await api.post('/auth/register/begin', { email });
-      
-      let attResp;
-      try {
-        attResp = await startRegistration(options);
-      } catch (error) {
-        if (error.name === 'NotAllowedError') {
-          throw new Error('Operación cancelada por el usuario');
-        }
-        throw new Error('Error en la autenticación biométrica');
+      if (mode === 'invite') {
+        await enrollWithInvitation(inviteToken, deviceName.trim());
+        setMessage({ type: 'success', text: '✅ Passkey enrolada. Redirigiendo al inicio de sesión...' });
+        setTimeout(() => navigate('/login', { replace: true }), 2000);
+      } else {
+        await addPasskey(deviceName.trim());
+        setMessage({ type: 'success', text: '✅ Passkey agregada. Volviendo al panel...' });
+        setTimeout(() => navigate('/dashboard', { replace: true }), 1500);
       }
-
-      const { data: result } = await api.post('/auth/register/complete', {
-        email,
-        credential: attResp,
-        device_name: deviceName
-      });
-
-      if (result.success) {
-        setMessage({ 
-          type: 'success', 
-          text: '✅ Passkey enrolada exitosamente. Redirigiendo al login...' 
-        });
-        
-        setTimeout(() => {
-          navigate('/login');
-        }, 2000);
-      }
-
     } catch (error) {
-      console.error('Error en enrolamiento:', error);
-      setMessage({ 
-        type: 'error', 
-        text: error.response?.data?.detail || error.message || 'Error al enrolar Passkey'
-      });
+      setMessage({ type: 'error', text: errorMessage(error, 'Error al enrolar la passkey') });
     } finally {
       setLoading(false);
     }
   };
 
+  if (mode === 'none') {
+    return (
+      <div className="auth-container">
+        <div className="auth-card">
+          <h2>📱 Enrolar Passkey</h2>
+          <div className="message warning">
+            Para enrolar tu primera passkey necesitás el link de invitación que te envía el administrador.
+            Si perdiste tu dispositivo, pedí una recuperación de cuenta.
+          </div>
+          <div className="auth-links">
+            <button onClick={() => navigate('/login')} className="link-button">← Volver al Login</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const title = mode === 'add' ? '📱 Agregar otra Passkey'
+    : invitation?.purpose === 'recovery' ? '🔄 Recuperar acceso' : '📱 Enrolar tu Passkey';
+  const formDisabled = loading || checking || (mode === 'invite' && !invitation);
+
   return (
     <div className="auth-container">
       <div className="auth-card">
-        <h2>📱 Enrolar Nueva Passkey</h2>
+        <h2>{title}</h2>
         <p className="auth-subtitle">
-          Registra tu dispositivo para autenticación sin contraseña
+          {mode === 'add'
+            ? 'Registrá otro dispositivo para poder iniciar sesión desde él'
+            : 'Registrá este dispositivo para iniciar sesión sin contraseña'}
         </p>
+
+        {checking && <p>Validando invitación...</p>}
 
         <form onSubmit={handleEnroll} className="auth-form">
           <div className="form-group">
-            <label htmlFor="email">📧 Email</label>
+            <label htmlFor="email">📧 Cuenta</label>
             <input
               type="email"
               id="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="usuario@empresa.com"
-              required
-              disabled={loading}
+              value={mode === 'add' ? user.email : invitation?.email || ''}
+              readOnly
+              disabled
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="deviceName">💻 Nombre del Dispositivo</label>
+            <label htmlFor="deviceName">💻 Nombre del dispositivo</label>
             <input
               type="text"
               id="deviceName"
               value={deviceName}
               onChange={(e) => setDeviceName(e.target.value)}
-              placeholder="Ej: Laptop Dell Trabajo"
+              placeholder="Ej: Notebook trabajo, iPhone"
+              maxLength={100}
               required
-              disabled={loading}
+              disabled={formDisabled}
             />
           </div>
 
-          {message.text && (
-            <div className={`message ${message.type}`}>
-              {message.text}
-            </div>
-          )}
+          {message.text && <div className={`message ${message.type}`}>{message.text}</div>}
 
-          <button 
-            type="submit" 
-            className="btn-primary" 
-            disabled={loading}
-          >
-            {loading ? (
-              <>
-                <span className="spinner-small"></span>
-                Enrolando...
-              </>
-            ) : (
-              '🔑 Enrolar Passkey'
-            )}
+          <button type="submit" className="btn-primary" disabled={formDisabled}>
+            {loading ? (<><span className="spinner-small"></span> Enrolando...</>) : '🔑 Enrolar Passkey'}
           </button>
         </form>
 
         <div className="auth-links">
-          <button 
-            onClick={() => navigate('/login')} 
+          <button
+            onClick={() => navigate(mode === 'add' ? '/dashboard' : '/login')}
             className="link-button"
             disabled={loading}
           >
-            ← Volver al Login
+            ← Volver
           </button>
         </div>
 
         <div className="info-box">
           <h4>ℹ️ ¿Qué es una Passkey?</h4>
           <p>
-            Las Passkeys son credenciales criptográficas que reemplazan las contraseñas tradicionales.
-            Utilizan biometría (huella, Face ID) o PIN del dispositivo para autenticarte de forma segura.
+            Una credencial criptográfica que reemplaza a la contraseña. La clave privada nunca sale de tu
+            dispositivo y se desbloquea con tu huella, rostro o PIN.
           </p>
           <ul>
             <li>✅ Sin contraseñas que recordar</li>
-            <li>✅ Resistente a phishing</li>
-            <li>✅ Autenticación en segundos</li>
+            <li>✅ Resistente a phishing: solo funciona en este sitio</li>
             <li>✅ Estándar FIDO2/WebAuthn</li>
           </ul>
         </div>

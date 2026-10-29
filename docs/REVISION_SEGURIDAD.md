@@ -17,21 +17,24 @@ La autenticación WebAuthn **no verifica criptográficamente nada**: no valida l
 
 La librería `webauthn` (py_webauthn 1.11) está en `requirements.txt` y se importa, pero sus funciones de verificación nunca se llaman.
 
-| # | Hallazgo | Severidad | Verificado |
-|---|----------|-----------|-----------|
-| H1 | Verificación de autenticación WebAuthn simulada (sin firma) | Crítica | Sí, PoC |
-| H2 | Challenge tomado del cliente y nunca comparado | Crítica | Sí, PoC |
-| H3 | Registro de passkeys sin autenticación previa (account takeover) | Crítica | Sí, PoC |
-| H4 | Ningún endpoint valida el JWT; admin abierto | Crítica | Sí, PoC |
-| H5 | OTP de step-up devuelto en la respuesta y escrito en el log | Alta | Sí, PoC |
-| H6 | `verify_token` lanza `AttributeError` ante un token inválido | Media | Sí |
-| H7 | Fingerprint de dispositivo por User-Agent y no atado al usuario | Alta | Código |
-| H8 | CORS con credenciales para cualquier `*.onrender.com` | Alta | Código |
-| H9 | IP de cliente detrás de proxy / IPs privadas tratadas como Argentina | Media | Código (verificar en Render) |
-| H10 | Estado efímero en memoria (challenges, step-up) | Media | Código |
-| H11 | OTP generado con `random` y sin límite de intentos | Media | Código |
-| H12 | Errores internos expuestos al cliente (`detail=str(e)`) | Baja | Código |
-| H13 | Dependencias faltantes y desactualizadas | Baja | Sí |
+| # | Hallazgo | Severidad | Estado en v2 |
+|---|----------|-----------|--------------|
+| H1 | Verificación de autenticación WebAuthn simulada (sin firma) | Crítica | ✅ Corregido |
+| H2 | Challenge tomado del cliente y nunca comparado | Crítica | ✅ Corregido |
+| H3 | Registro de passkeys sin autenticación previa (account takeover) | Crítica | ✅ Corregido |
+| H4 | Ningún endpoint valida el JWT; admin abierto | Crítica | ✅ Corregido |
+| H5 | OTP de step-up devuelto en la respuesta y escrito en el log | Alta | ✅ Corregido |
+| H6 | `verify_token` lanza `AttributeError` ante un token inválido | Media | ✅ Corregido |
+| H7 | Fingerprint de dispositivo por User-Agent y no atado al usuario | Alta | 🟡 Parcial: atado al usuario; sigue basado en User-Agent |
+| H8 | CORS con credenciales para cualquier `*.onrender.com` | Alta | ✅ Corregido |
+| H9 | IP de cliente detrás de proxy / IPs privadas tratadas como Argentina | Media | ⏳ Pendiente (fase 3) |
+| H10 | Estado efímero en memoria (challenges, step-up) | Media | ✅ Corregido |
+| H11 | OTP generado con `random` y sin límite de intentos | Media | 🟡 Parcial: step-up limitado; falta límite en login |
+| H12 | Errores internos expuestos al cliente (`detail=str(e)`) | Baja | ✅ Corregido |
+| H13 | Dependencias faltantes y desactualizadas | Baja | ✅ Corregido |
+| H14 | Políticas `new_device` / `unusual_location` nunca se evaluaban (siempre coincidían) | Media | ✅ Corregido (hallado en v2) |
+
+El detalle de cada corrección está en `docs/CAMBIOS_V2.md`.
 
 ---
 

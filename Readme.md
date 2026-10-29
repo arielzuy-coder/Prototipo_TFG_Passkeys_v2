@@ -11,6 +11,14 @@
 
 ---
 
+> **Versión 2 (en desarrollo).** Esta rama corrige los hallazgos de la revisión de seguridad
+> (`docs/REVISION_SEGURIDAD.md`): verificación WebAuthn real con py_webauthn, alta de usuarios por
+> invitación, control de acceso por roles (Usuario / Auditor / Administrador), step-up por passkey,
+> OTP o aprobación de supervisor, y rotación de refresh tokens. Detalle y configuración en
+> `docs/CAMBIOS_V2.md`. El primer administrador se crea con `BOOTSTRAP_ADMIN_EMAIL` (ver `.env.example`).
+
+---
+
 ## 🎯 Descripción
 
 Sistema de autenticación sin contraseñas (passwordless) basado en el estándar FIDO2/WebAuthn, integrado con un motor de evaluación de riesgo continuo bajo el paradigma Zero Trust. El sistema implementa autenticación adaptativa (step-up) según el nivel de riesgo detectado y proporciona un panel de administración para gestionar políticas de seguridad.

@@ -1,0 +1,243 @@
+/* Estilos de los componentes agregados en la v2: usuarios, aprobaciones y step-up */
+
+/* ---------- Panel de usuarios y aprobaciones ---------- */
+.au-section {
+  margin-top: 28px;
+}
+
+.au-section:first-child {
+  margin-top: 8px;
+}
+
+.au-section h3 {
+  margin: 0 0 4px;
+  color: #333;
+  font-size: 1.15rem;
+}
+
+.au-hint {
+  margin: 0 0 14px;
+  color: #777;
+  font-size: 0.9rem;
+}
+
+.au-list {
+  display: grid;
+  gap: 12px;
+}
+
+.au-card {
+  background: #fff;
+  border: 1px solid #e6e8f0;
+  border-radius: 12px;
+  padding: 16px 18px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.au-card.au-pending {
+  border-left: 4px solid #f0ad4e;
+  background: #fffaf2;
+}
+
+.au-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.au-card-header h4 {
+  margin: 0;
+  font-size: 1rem;
+  color: #333;
+}
+
+.au-card-header h4 small {
+  color: #888;
+  font-weight: 400;
+}
+
+.au-meta {
+  margin: 8px 0 0;
+  color: #555;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.au-ua {
+  margin: 4px 0 0;
+  color: #999;
+  font-size: 0.78rem;
+  word-break: break-all;
+}
+
+.au-meta select {
+  padding: 4px 8px;
+  border: 1px solid #d5d8e3;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 0.88rem;
+}
+
+.au-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.au-actions button {
+  width: auto;
+  padding: 8px 14px;
+  font-size: 0.88rem;
+  margin: 0;
+}
+
+.au-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.au-badge.active { background: #e6f6ec; color: #1e7b3c; }
+.au-badge.pending { background: #fff3dc; color: #9a6400; }
+.au-badge.suspended { background: #fde8e8; color: #b42318; }
+.au-badge.risk { background: #fff3dc; color: #9a6400; }
+
+.au-form .form-row {
+  display: grid;
+  grid-template-columns: 2fr 1.5fr 1.5fr;
+  gap: 12px;
+}
+
+.au-form select {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 1rem;
+  background: #fff;
+}
+
+.au-form .btn-primary {
+  width: auto;
+  padding: 10px 22px;
+}
+
+.au-invite input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #d5d8e3;
+  border-radius: 8px;
+  font-family: monospace;
+  font-size: 0.85rem;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.btn-danger {
+  background: #fff;
+  color: #c0392b;
+  border: 2px solid #e8b4ae;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #fdecea;
+}
+
+.btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---------- Step-up ---------- */
+.verification-method-selector {
+  margin: 18px 0 8px;
+}
+
+.verification-method-selector > label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #444;
+}
+
+.method-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.method-btn {
+  flex: 1 1 160px;
+  padding: 10px 12px;
+  border: 2px solid #d5d8e3;
+  border-radius: 10px;
+  background: #fff;
+  color: #444;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.method-btn:hover:not(:disabled) {
+  border-color: #667eea;
+}
+
+.method-btn.active {
+  border-color: #667eea;
+  background: #eef0fd;
+  color: #4b5bd6;
+}
+
+.method-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.stepup-form .verification-input {
+  margin: 14px 0;
+}
+
+.stepup-form .verification-input p {
+  margin: 0 0 12px;
+}
+
+.stepup-form .verification-input input {
+  width: 100%;
+  padding: 12px;
+  margin: 6px 0 12px;
+  font-size: 1.4rem;
+  letter-spacing: 0.4em;
+  text-align: center;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+.stepup-actions {
+  margin-top: 10px;
+}
+
+.timer-display {
+  margin: 12px 0 0;
+}
+
+@media (max-width: 720px) {
+  .au-form .form-row {
+    grid-template-columns: 1fr;
+  }
+}

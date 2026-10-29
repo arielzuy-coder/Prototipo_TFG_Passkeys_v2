@@ -14,12 +14,16 @@ services:
         generateValue: true
       - key: JWT_SECRET
         generateValue: true
+      # RP_ID = dominio del FRONTEND (no del backend): es donde el navegador crea y usa la passkey
       - key: RP_ID
-        value: changeme-backend-url.onrender.com
+        value: changeme-frontend-url.onrender.com
       - key: RP_NAME
         value: Prototipo Auth TFG
       - key: ORIGIN
         value: https://changeme-frontend-url.onrender.com
+      # Si no hay administradores, el log del primer arranque muestra el link de invitación
+      - key: BOOTSTRAP_ADMIN_EMAIL
+        value: changeme@empresa.com
     healthCheckPath: /health
     plan: free
 

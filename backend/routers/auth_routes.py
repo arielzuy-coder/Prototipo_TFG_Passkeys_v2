@@ -283,6 +283,8 @@ def login_complete(request: Request, data: LoginCompleteRequest, db: DBSession =
         token = secrets.token_urlsafe(32)
         expires_at = datetime.utcnow() + timedelta(minutes=settings.STEPUP_TTL_MINUTES)
         adjusted_score = max(float(settings.RISK_THRESHOLD_LOW), score)
+        # El nivel mostrado debe ser coherente con el puntaje ajustado
+        adjusted_level = "high" if adjusted_score >= settings.RISK_THRESHOLD_HIGH else "medium"
         tx = StepUpTransaction(
             user_id=user.id,
             token_hash=hash_token(token),
@@ -293,7 +295,7 @@ def login_complete(request: Request, data: LoginCompleteRequest, db: DBSession =
                 "user_agent": ua,
                 "location": location,
                 "risk_score": adjusted_score,
-                "risk_level": risk["level"],
+                "risk_level": adjusted_level,
                 "policy": decision["policy_name"],
                 "credential_id": passkey.credential_id[:16] + "...",
                 "factors": factors,
@@ -309,7 +311,7 @@ def login_complete(request: Request, data: LoginCompleteRequest, db: DBSession =
             "stepup_token": token,
             "expires_at": expires_at.isoformat() + "Z",
             "verification_methods": _available_stepup_methods(),
-            "risk_assessment": {"score": adjusted_score, "level": risk["level"], "factors": factors},
+            "risk_assessment": {"score": adjusted_score, "level": adjusted_level, "factors": factors},
             "user": serialize_user(user),
         }
 

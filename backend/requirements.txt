@@ -7,7 +7,6 @@ pydantic-settings==2.6.1
 pyjwt==2.15.1
 webauthn==3.0.1
 cryptography==50.0.2
-geoip2==4.7.0
 user-agents==2.2.0
 httpx==0.28.1
 requests==2.32.5

@@ -134,7 +134,5 @@ def touch_device(db: DBSession, user: User, request: Request, location: Optional
             ))
         db.commit()
     except IntegrityError:
-        # El esquema original tiene fingerprint único global; si otro usuario
-        # ya lo registró, no se crea (pendiente de migración en fase 3).
+        # Carrera entre dos requests del mismo usuario: el dispositivo ya existe
         db.rollback()
-        logger.info("Fingerprint de dispositivo ya registrado por otro usuario; se omite")

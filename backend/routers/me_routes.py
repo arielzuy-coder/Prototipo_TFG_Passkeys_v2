@@ -1,4 +1,5 @@
 """Autoservicio del usuario: sus passkeys (RF-08, máx. 5) y su historial de accesos."""
+import uuid
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -16,9 +17,21 @@ router = APIRouter(tags=["Usuario"])
 webauthn_handler = WebAuthnHandler()
 
 
+class RenamePasskey(BaseModel):
+    device_name: str = Field(min_length=1, max_length=100)
+
+
 class AddPasskeyComplete(BaseModel):
     credential: Dict[str, Any]
     device_name: Optional[str] = Field(default=None, max_length=100)
+
+
+def _own_passkey(db: DBSession, current: CurrentUser, passkey_id: str) -> Optional[Passkey]:
+    try:
+        pid = uuid.UUID(passkey_id)
+    except ValueError:
+        return None
+    return db.query(Passkey).filter(Passkey.id == pid, Passkey.user_id == current.user.id).first()
 
 
 def serialize_passkey(pk: Passkey) -> Dict[str, Any]:
@@ -81,13 +94,21 @@ def add_passkey_complete(request: Request, data: AddPasskeyComplete,
     return {"success": True, "message": "Passkey agregada"}
 
 
+@router.put("/passkeys/{passkey_id}")
+def rename_my_passkey(passkey_id: str, data: RenamePasskey,
+                      current: CurrentUser = Depends(get_current_user), db: DBSession = Depends(get_db)):
+    passkey = _own_passkey(db, current, passkey_id)
+    if passkey is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Passkey no encontrada")
+    passkey.device_name = data.device_name.strip()
+    db.commit()
+    return {"success": True, "passkey": serialize_passkey(passkey)}
+
+
 @router.delete("/passkeys/{passkey_id}")
 def revoke_my_passkey(passkey_id: str, request: Request,
                       current: CurrentUser = Depends(get_current_user), db: DBSession = Depends(get_db)):
-    try:
-        passkey = db.query(Passkey).filter(Passkey.id == passkey_id, Passkey.user_id == current.user.id).first()
-    except Exception:
-        passkey = None
+    passkey = _own_passkey(db, current, passkey_id)
     if passkey is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Passkey no encontrada")
     if db.query(Passkey).filter(Passkey.user_id == current.user.id).count() <= 1:

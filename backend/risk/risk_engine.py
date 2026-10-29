@@ -57,6 +57,10 @@ class RiskEngine:
             logger.info(f"[RISK ENGINE] {factor_name}: {factor_data['score']} pts (peso {self.weights[factor_name]}) = {weighted_score:.2f} pts ponderados")
             logger.info(f"[RISK ENGINE]   └─ {factor_data['message']}")
         
+        # Señales booleanas que usan las políticas (condiciones new_device / unusual_location)
+        context['new_device'] = not factors['device'].get('known', False)
+        context['unusual_location'] = not factors['location'].get('known', False)
+
         total_score = sum(
             factors[factor]['score'] * self.weights[factor]
             for factor in factors

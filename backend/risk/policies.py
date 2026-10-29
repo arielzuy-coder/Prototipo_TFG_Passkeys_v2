@@ -77,12 +77,13 @@ class PolicyEngine:
             else:
                 logger.info(f"[POLICY ENGINE] ❌ NO MATCH - Continuando con siguiente política...")
         
-        logger.info(f"[POLICY ENGINE] ⚠️ Ninguna política matcheó - Usando política por defecto (allow)")
+        # Zero Trust: si ninguna política cubre el caso, no se concede acceso directo.
+        logger.info(f"[POLICY ENGINE] ⚠️ Ninguna política matcheó - Por defecto se exige step-up")
         logger.info(f"[POLICY ENGINE] ===== FIN EVALUACIÓN POLÍTICAS =====")
         return {
-            'action': 'allow',
+            'action': 'stepup',
             'policy_name': 'default',
-            'policy_description': 'Política por defecto',
+            'policy_description': 'Sin política aplicable: verificación adicional por defecto',
             'matched': False
         }
     
@@ -181,6 +182,17 @@ class PolicyEngine:
                     return False
                 logger.info(f"[POLICY ENGINE]   ❌ Fuera de horario laboral - política APLICA (stepup/deny)")
         
+        # Condiciones booleanas de contexto. Antes no se evaluaban y la política
+        # coincidía siempre (ej. 'new_device_stepup' pedía step-up en todos los logins).
+        for flag in ('new_device', 'unusual_location'):
+            if flag in conditions:
+                expected = bool(conditions[flag])
+                actual = bool(context.get(flag, True))  # sin dato: se asume la condición de riesgo
+                if actual != expected:
+                    logger.info(f"[POLICY ENGINE]   ❌ {flag}={actual} (se esperaba {expected}) - NO cumple")
+                    return False
+                logger.info(f"[POLICY ENGINE]   ✅ {flag}={actual} - Cumple")
+
         logger.info(f"[POLICY ENGINE]   ✅ TODAS las condiciones cumplen - MATCH!")
         return True
     

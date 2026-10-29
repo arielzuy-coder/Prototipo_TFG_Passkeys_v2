@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../services/api';
+import api, { errorMessage } from '../services/api';
 
 function Dashboard({ user, onLogout }) {
   const navigate = useNavigate();
@@ -12,28 +12,35 @@ function Dashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('passkeys');
   const [editingPasskey, setEditingPasskey] = useState(null);
   const [newName, setNewName] = useState('');
+  const canAudit = ['admin', 'auditor'].includes(user.role);
+  const isAdmin = user.role === 'admin';
 
   useEffect(() => {
     loadDashboardData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadDashboardData = async () => {
     setLoading(true);
     
     try {
-      const { data: passkeysData } = await api.get(`/passkeys/${user.email}`);
+      const { data: passkeysData } = await api.get('/passkeys');
       setPasskeys(passkeysData.passkeys || []);
     } catch (error) {
       console.error('Error al cargar passkeys:', error);
     }
 
     try {
-      const { data: eventsData } = await api.get('/audit/events', {
-        params: { user_email: user.email, limit: 20 }
-      });
+      const { data: eventsData } = await api.get('/me/events', { params: { limit: 20 } });
       setAuditEvents(eventsData.events || []);
     } catch (error) {
       console.error('Error al cargar eventos:', error);
+    }
+
+    // Métricas globales: solo administradores y auditores (Tabla 4 de la tesis)
+    if (!canAudit) {
+      setLoading(false);
+      return;
     }
 
     try {
@@ -63,7 +70,7 @@ function Dashboard({ user, onLogout }) {
       alert('✅ Passkey revocada exitosamente');
       loadDashboardData();
     } catch (error) {
-      alert(`❌ Error: ${error.response?.data?.detail || error.message}`);
+      alert(`❌ Error: ${errorMessage(error)}`);
     }
   };
 
@@ -73,19 +80,15 @@ function Dashboard({ user, onLogout }) {
   };
 
   const savePasskeyName = async (passkeyId) => {
-    // Nota: Este endpoint no existe en el backend actual
-    // Se puede implementar si se necesita
     try {
-      // await api.put(`/passkeys/${passkeyId}`, { device_name: newName });
-      // Por ahora solo actualizamos localmente
-      setPasskeys(passkeys.map(pk => 
+      await api.put(`/passkeys/${passkeyId}`, { device_name: newName });
+      setPasskeys(passkeys.map(pk =>
         pk.id === passkeyId ? { ...pk, device_name: newName } : pk
       ));
       setEditingPasskey(null);
       setNewName('');
-      alert('✅ Nombre actualizado (simulado - no persiste en BD)');
     } catch (error) {
-      alert(`❌ Error: ${error.message}`);
+      alert(`❌ Error: ${errorMessage(error)}`);
     }
   };
 
@@ -190,9 +193,16 @@ function Dashboard({ user, onLogout }) {
           <p className="user-email">{user.email}</p>
         </div>
         <div className="header-actions">
-          <button onClick={() => navigate('/admin')} className="btn-admin">
-            ⚙️ Panel Admin
-          </button>
+          {isAdmin && (
+            <button onClick={() => navigate('/admin')} className="btn-admin">
+              ⚙️ Panel Admin
+            </button>
+          )}
+          {canAudit && (
+            <button onClick={() => navigate('/audit')} className="btn-admin">
+              📑 Auditoría
+            </button>
+          )}
           <button onClick={onLogout} className="btn-logout">
             🚪 Cerrar Sesión
           </button>
@@ -230,12 +240,14 @@ function Dashboard({ user, onLogout }) {
         >
           📋 Historial de Acceso
         </button>
-        <button 
-          className={`tab ${activeTab === 'stats' ? 'active' : ''}`}
-          onClick={() => setActiveTab('stats')}
-        >
-          📊 Estadísticas del Sistema
-        </button>
+        {canAudit && (
+          <button
+            className={`tab ${activeTab === 'stats' ? 'active' : ''}`}
+            onClick={() => setActiveTab('stats')}
+          >
+            📊 Estadísticas del Sistema
+          </button>
+        )}
       </div>
 
       <div className="dashboard-content">
@@ -271,18 +283,18 @@ function Dashboard({ user, onLogout }) {
                     <span className="stat-icon">💻</span>
                     <div>
                       <div className="stat-number">
-                        {passkeys.filter(pk => pk.device_type === 'platform').length}
+                        {passkeys.filter(pk => pk.device_type === 'multi_device').length}
                       </div>
-                      <div className="stat-label">Biométricas</div>
+                      <div className="stat-label">Sincronizadas</div>
                     </div>
                   </div>
                   <div className="stat-item">
                     <span className="stat-icon">🔐</span>
                     <div>
                       <div className="stat-number">
-                        {passkeys.filter(pk => pk.device_type !== 'platform').length}
+                        {passkeys.filter(pk => pk.device_type !== 'multi_device').length}
                       </div>
-                      <div className="stat-label">Hardware (USB)</div>
+                      <div className="stat-label">Ligadas al dispositivo</div>
                     </div>
                   </div>
                 </div>
@@ -292,7 +304,7 @@ function Dashboard({ user, onLogout }) {
                     <div key={passkey.id} className="passkey-card-enhanced">
                       <div className="passkey-card-header">
                         <div className="passkey-icon-large">
-                          {passkey.device_type === 'platform' ? '💻' : '🔑'}
+                          {passkey.device_type === 'multi_device' ? '☁️' : '🔑'}
                         </div>
                         <div className="passkey-status">
                           <span className="status-badge active">● Activa</span>
@@ -338,9 +350,9 @@ function Dashboard({ user, onLogout }) {
                             </h4>
                             <p className="passkey-type">
                               <span className="type-badge">
-                                {passkey.device_type === 'platform' ? 
-                                  '💻 Biométrica (Huella/Face ID)' : 
-                                  '🔐 Hardware (USB/NFC)'}
+                                {passkey.device_type === 'multi_device' ?
+                                  '☁️ Sincronizada (gestor de passkeys)' :
+                                  '🔐 Ligada a un solo dispositivo'}
                               </span>
                             </p>
                           </>
@@ -387,8 +399,13 @@ function Dashboard({ user, onLogout }) {
                 </div>
 
                 <div className="passkeys-actions">
-                  <button className="btn-secondary" onClick={() => navigate('/enroll')}>
-                    ➕ Agregar Nueva Passkey
+                  <button
+                    className="btn-secondary"
+                    onClick={() => navigate('/enroll')}
+                    disabled={passkeys.length >= 5}
+                    title={passkeys.length >= 5 ? 'Máximo 5 passkeys por usuario' : ''}
+                  >
+                    ➕ Agregar Nueva Passkey {passkeys.length >= 5 ? '(máximo alcanzado)' : ''}
                   </button>
                 </div>
               </>
