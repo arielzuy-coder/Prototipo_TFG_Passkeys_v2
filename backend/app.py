@@ -18,6 +18,7 @@ from routers.admin_routes import router as admin_router
 from routers.auth_routes import router as auth_router
 from routers.me_routes import router as me_router
 from routers.monitoring_routes import router as monitoring_router
+from routers.sus_routes import router as sus_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -52,6 +53,7 @@ app.include_router(me_router)
 app.include_router(admin_router)
 app.include_router(monitoring_router)
 app.include_router(audit_reports_router)
+app.include_router(sus_router)
 
 
 @app.get("/")

@@ -57,7 +57,9 @@ def audit(db: DBSession, event_type: str, request: Optional[Request] = None, *,
     payload = dict(data or {})
     if actor_id is not None:
         payload["actor_id"] = str(actor_id)
-    db.add(AuditEvent(
+    from services import audit_chain  # import diferido: audit_chain importa models
+
+    audit_chain.append(db, AuditEvent(
         user_id=user_id,
         session_id=session_id,
         event_type=event_type,

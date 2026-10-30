@@ -4,7 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const ROUTES = ['enroll', 'login', 'dashboard', 'admin', 'risk', 'audit'];
+const ROUTES = ['enroll', 'login', 'dashboard', 'admin', 'risk', 'audit', 'sus'];
 const build = path.join(__dirname, '..', 'build');
 const index = fs.readFileSync(path.join(build, 'index.html'));
 

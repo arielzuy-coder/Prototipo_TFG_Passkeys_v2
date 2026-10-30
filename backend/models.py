@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Boolean, DateTime, Text, ForeignKey, DECIMAL, JSON, UniqueConstraint
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, Text, ForeignKey, DECIMAL, JSON, UniqueConstraint, BigInteger
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -126,6 +126,10 @@ class AuditEvent(Base):
     ip_address = Column(String(45))
     user_agent = Column(Text)
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    # Cadena de integridad (RNF-S4): cada evento sella el anterior con HMAC-SHA256
+    chain_seq = Column(BigInteger, unique=True, index=True)
+    prev_hash = Column(String(64))
+    event_hash = Column(String(64))
 
 
 class WebAuthnChallenge(Base):
@@ -185,3 +189,15 @@ class RateLimit(Base):
     key = Column(String(200), primary_key=True)
     window_start = Column(DateTime, nullable=False)
     count = Column(Integer, nullable=False, default=0)
+
+
+class SusResponse(Base):
+    """Respuesta anónima al cuestionario System Usability Scale (RNF-U2)."""
+    __tablename__ = "sus_responses"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    answers = Column(JSON, nullable=False)        # 10 valores de 1 a 5, en el orden del cuestionario
+    score = Column(DECIMAL(5, 2), nullable=False)  # 0 a 100
+    profile = Column(String(20))                   # perfil con el que probó el sistema (opcional)
+    comment = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)

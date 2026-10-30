@@ -83,7 +83,7 @@ de 15 minutos con refresh de 8 horas y rotación obligatoria.
 
 ## Verificación
 
-- `backend/tests/`: 56 tests con un autenticador FIDO2 por software que firma con claves reales.
+- `backend/tests/`: 70 tests con un autenticador FIDO2 por software que firma con claves reales.
   Cada ataque de la revisión tiene su test (firma alterada, challenge propio, replay, otro origen,
   invitación reutilizada, endpoints sin token, matriz de roles, reuso de refresh, bloqueo de step-up, etc.).
 
@@ -169,6 +169,26 @@ de 15 minutos con refresh de 8 horas y rotación obligatoria.
   Por defecto 08:00–19:00 de lunes a viernes, como antes.
 - Verificado: 59 tests y la prueba en navegador, que ahora cubre la revocación con dos passkeys, el
   bloqueo con una sola y la tabla de factores del step-up.
+
+## Registro de auditoría inmutable (RNF-S4)
+
+- Cada evento lleva un número de secuencia (`chain_seq`), el sello del anterior (`prev_hash`) y su propio
+  sello (`event_hash`): HMAC-SHA256 sobre el contenido del evento y el sello anterior
+  (`services/audit_chain.py`). La clave deriva de `SECRET_KEY`, que no está en la base.
+- `GET /api/audit/integrity` (auditor y administrador) recorre la cadena y devuelve el primer evento
+  modificado, borrado o intercalado, o el ancla (último n.º y sello) si está íntegra. En *Auditoría* hay un
+  botón "Verificar integridad"; el navegador recuerda el ancla para detectar también eventos borrados al final.
+- Un trigger de PostgreSQL (`audit_events_append_only`) rechaza UPDATE y DELETE de eventos sellados.
+  Quien controle la base podría desactivarlo, pero sin la clave no puede rehacer los sellos.
+- Al desplegar, los eventos existentes se sellan en orden cronológico. Las exportaciones CSV/JSON incluyen
+  `chain_seq` y los sellos.
+
+## Medición de usabilidad SUS (RNF-U2)
+
+- Encuesta anónima en `/sus` (10 ítems del System Usability Scale, versión en español), sin sesión y con
+  límite de 10 respuestas por IP y hora. Puntaje según Brooke (1996).
+- `GET /api/audit/sus` y la sección *Usabilidad (SUS)* en Auditoría: promedio, mediana, desvío, mínimo,
+  máximo, promedio por ítem y comentarios, contra la meta de 70/100.
 
 ## Pendiente
 

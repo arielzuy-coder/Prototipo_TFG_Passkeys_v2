@@ -135,7 +135,7 @@ def generate_csv(events: List[AuditEvent], include_fields: Optional[List[str]] =
     output = io.StringIO()
     
     # Definir campos por defecto
-    default_fields = ['id', 'timestamp', 'event_type', 'user_id', 'ip_address', 'user_agent']
+    default_fields = ['chain_seq', 'id', 'timestamp', 'event_type', 'user_id', 'ip_address', 'user_agent', 'event_hash']
     fields = include_fields if include_fields else default_fields
     
     writer = csv.DictWriter(output, fieldnames=fields)
@@ -179,7 +179,7 @@ def generate_json(events: List[AuditEvent], include_fields: Optional[List[str]] 
     """Genera contenido JSON desde eventos de auditoría - VERSIÓN CORREGIDA"""
     
     result = []
-    default_fields = ['id', 'timestamp', 'event_type', 'user_id', 'ip_address', 'user_agent', 'event_data']
+    default_fields = ['chain_seq', 'id', 'timestamp', 'event_type', 'user_id', 'ip_address', 'user_agent', 'event_data', 'prev_hash', 'event_hash']
     fields = include_fields if include_fields else default_fields
     
     logger.info(f"Generando JSON con {len(events)} eventos")
@@ -453,6 +453,17 @@ async def search_audit_events(
     except Exception as e:
         logger.error(f"Error en búsqueda de eventos: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error en búsqueda de eventos")
+
+
+@router.get("/integrity")
+async def verify_audit_integrity(db: Session = Depends(get_db)):
+    """
+    RNF-S4: recorre la cadena de auditoría y verifica que ningún evento haya sido
+    modificado, borrado o intercalado. Devuelve el ancla (último n.º y sello) para
+    comparar en verificaciones futuras.
+    """
+    from services import audit_chain
+    return audit_chain.verify(db)
 
 
 @router.get("/statistics/summary")

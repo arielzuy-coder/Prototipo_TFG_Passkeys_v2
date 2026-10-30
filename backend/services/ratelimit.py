@@ -34,6 +34,7 @@ LIMITS = {
     "stepup:ip": (30, 300),
     "refresh:ip": (60, 300),
     "reauth:account": (20, 300),
+    "sus:ip": (10, 3600),
 }
 
 

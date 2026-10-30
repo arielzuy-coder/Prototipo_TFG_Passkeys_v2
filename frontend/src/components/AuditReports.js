@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/AuditReports.css';
 import api from '../services/api';
+import AuditIntegrity from './AuditIntegrity';
+import SusResults from './SusResults';
 
 // El input datetime-local está en hora local del navegador: se envía con zona (UTC) al backend
 const toUtcIso = (value) => (value ? new Date(value).toISOString() : null);
@@ -169,6 +171,10 @@ const AuditReports = () => {
           </div>
         </div>
       )}
+
+      <AuditIntegrity />
+
+      <SusResults />
       
       {/* Filtros Avanzados */}
       <div className="filters-section">

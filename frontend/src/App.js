@@ -11,6 +11,7 @@ import RiskMonitor from './components/RiskMonitor';
 import AuditReports from './components/AuditReports';
 import ReauthPrompt from './components/ReauthPrompt';
 import { NotifierProvider } from './components/Notifier';
+import SusSurvey from './components/SusSurvey';
 import api, { clearSession, saveSession } from './services/api';
 
 const ROLE_LABELS = { admin: 'Administrador', auditor: 'Auditor', user: 'Usuario' };
@@ -149,6 +150,8 @@ function App() {
               }
             />
             
+            <Route path="/sus" element={<SusSurvey />} />
+
             <Route 
               path="/" 
               element={<Navigate to={user ? "/dashboard" : "/login"} replace />} 

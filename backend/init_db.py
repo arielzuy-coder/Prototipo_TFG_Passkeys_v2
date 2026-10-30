@@ -2,7 +2,7 @@
 Script de inicialización de base de datos para producción en Render
 """
 from sqlalchemy import text
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 from models import Base, Policy, User
 from config import settings
 from database import engine
@@ -35,14 +35,30 @@ MIGRATIONS = [
     # Usuarios activos sin ninguna passkey válida quedan pendientes de re-enrolamiento
     "UPDATE users SET status = 'pending' WHERE status = 'active' "
     "AND NOT EXISTS (SELECT 1 FROM passkeys p WHERE p.user_id = users.id)",
+    # Registro de auditoría encadenado (RNF-S4)
+    "ALTER TABLE audit_events ADD COLUMN IF NOT EXISTS chain_seq BIGINT",
+    "ALTER TABLE audit_events ADD COLUMN IF NOT EXISTS prev_hash VARCHAR(64)",
+    "ALTER TABLE audit_events ADD COLUMN IF NOT EXISTS event_hash VARCHAR(64)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS ix_audit_events_chain_seq ON audit_events (chain_seq)",
 ]
 
 
 def migrate_schema():
     """Migraciones idempotentes para bases creadas con la v1 (create_all no altera tablas existentes)."""
+    from services import audit_chain
+
     with engine.begin() as conn:
         for stmt in MIGRATIONS:
             conn.execute(text(stmt))
+    try:
+        with engine.begin() as conn:
+            audit_chain.install_guard(conn)
+    except Exception as e:  # sin permisos para crear el trigger: la cadena igual detecta alteraciones
+        logger.warning("No se pudo instalar la protección de solo agregado en audit_events: %s", type(e).__name__)
+    with Session(engine) as session:
+        sealed = audit_chain.seal_pending(session)
+    if sealed:
+        logger.info("Eventos de auditoría previos sellados en la cadena: %s", sealed)
     logger.info("✅ Migraciones aplicadas")
 
 

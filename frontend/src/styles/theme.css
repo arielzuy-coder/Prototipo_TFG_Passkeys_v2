@@ -652,3 +652,72 @@ button:disabled, .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
 @media (max-width: 768px) {
   .dashboard-header { align-items: flex-start; text-align: left; }
 }
+
+/* Integridad del registro de auditoría */
+.integrity-section {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 22px 24px;
+  margin-bottom: 20px;
+}
+.integrity-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.integrity-head h3 { margin: 0 0 4px; }
+.integrity-help { color: var(--muted); font-size: 0.9rem; max-width: 680px; margin: 0; }
+.integrity-head .btn-primary { flex-shrink: 0; }
+.integrity-result {
+  margin-top: 16px;
+  border: 1px solid;
+  border-left-width: 4px;
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+}
+.integrity-result p { margin: 2px 0; }
+.integrity-result.ok { background: var(--low-soft); border-color: #a9d7bb; border-left-color: var(--low); color: #1f5236; }
+.integrity-result.broken { background: var(--high-soft); border-color: #f1b8b2; border-left-color: var(--high); color: #7a1a12; }
+.integrity-title { font-weight: 600; }
+.integrity-meta { font-size: 0.88rem; opacity: 0.9; }
+.integrity-meta code { font-family: var(--mono); font-size: 0.85rem; }
+@media (max-width: 760px) { .integrity-head { flex-direction: column; } }
+
+/* Encuesta SUS */
+.sus-container { max-width: 760px; margin: 0 auto; }
+.sus-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 32px; }
+.sus-card h2 { margin: 0 0 6px; }
+.sus-intro { color: var(--muted); margin: 0 0 18px; }
+.sus-legend { display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--muted); padding: 0 4px 8px; border-bottom: 1px solid var(--line-soft); }
+.sus-items { list-style: none; padding: 0; margin: 0 0 20px; counter-reset: sus; }
+.sus-item { border-bottom: 1px solid var(--line-soft); padding: 14px 0; counter-increment: sus; }
+.sus-item fieldset { border: none; padding: 0; margin: 0; }
+.sus-item legend { font-weight: 500; color: var(--ink-2); margin-bottom: 10px; padding: 0; }
+.sus-item legend::before { content: counter(sus) ". "; color: var(--muted); font-weight: 600; }
+.sus-scale { display: flex; gap: 8px; }
+.sus-scale label { flex: 1; position: relative; cursor: pointer; }
+.sus-scale input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.sus-scale span {
+  display: block; text-align: center; padding: 8px 0; border: 1px solid #bccbd9; border-radius: var(--radius-sm);
+  font-weight: 600; color: var(--ink-2); background: var(--surface);
+}
+.sus-scale label:hover span { border-color: var(--accent); }
+.sus-scale label.checked span { background: var(--accent); border-color: var(--accent); color: #fff; }
+.sus-scale input:focus-visible + span { box-shadow: var(--focus); }
+.sus-extra { display: grid; gap: 14px; margin-bottom: 18px; }
+.sus-extra textarea { resize: vertical; }
+.sus-card .btn-primary { width: 100%; padding: 11px 16px; }
+.sus-score { font-size: 1.15rem; color: var(--ink); }
+
+/* Resultados SUS */
+.sus-empty code { font-family: var(--mono); font-size: 0.85rem; }
+.sus-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 24px 40px; margin: 16px 0 18px; }
+.sus-big { display: flex; flex-direction: column; border-left: 4px solid var(--low); padding-left: 14px; }
+.sus-big.low { border-left-color: var(--medium); }
+.sus-big-number { font-size: 2.4rem; font-weight: 600; color: var(--ink); line-height: 1.1; }
+.sus-big-label { color: var(--muted); font-size: 0.9rem; }
+.sus-stats { display: flex; gap: 28px; margin: 0; }
+.sus-stats dt { color: var(--muted); font-size: 0.82rem; }
+.sus-stats dd { margin: 0; font-weight: 600; color: var(--ink); font-size: 1.1rem; }
+.sus-items-table td:nth-child(2), .sus-items-table td:nth-child(3) { white-space: nowrap; }
+.sus-comments h4 { margin: 16px 0 6px; }
+.sus-comments ul { margin: 0; padding-left: 18px; color: var(--ink-2); }
+.sus-comments li span { color: var(--muted); font-size: 0.85rem; }
+@media (max-width: 560px) { .sus-card { padding: 20px; } .sus-scale { gap: 4px; } }
